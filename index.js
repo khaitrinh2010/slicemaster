@@ -1,2065 +1,2046 @@
-// globalConfig.js
-// Provides global variables used by the entire program.
-// Most of this should be configuration.
-
-// Timing multiplier for entire game engine.
-let gameSpeed = 1;
-
-// Colors
-const BLUE =   { r: 0x67, g: 0xd7, b: 0xf0 };
-const GREEN =  { r: 0xa6, g: 0xe0, b: 0x2c };
-const PINK =   { r: 0xfa, g: 0x24, b: 0x73 };
-const ORANGE = { r: 0xfe, g: 0x95, b: 0x22 };
-const allColors = [BLUE, GREEN, PINK, ORANGE];
-
-// Gameplay
-const getSpawnDelay = () => {
-	const spawnDelayMax = 1400;
-	const spawnDelayMin = 550;
-	const spawnDelay = spawnDelayMax - state.game.cubeCount * 3.1;
-	return Math.max(spawnDelay, spawnDelayMin);
-}
-const doubleStrongEnableScore = 2000;
-// Number of cubes that must be smashed before activating a feature.
-const slowmoThreshold = 10;
-const strongThreshold = 25;
-const spinnerThreshold = 25;
-
-// Interaction state
-let pointerIsDown = false;
-// The last known position of the primary pointer in screen coordinates.`
-let pointerScreen = { x: 0, y: 0 };
-// Same as `pointerScreen`, but converted to scene coordinates in rAF.
-let pointerScene = { x: 0, y: 0 };
-// Minimum speed of pointer before "hits" are counted.
-const minPointerSpeed = 60;
-// The hit speed affects the direction the target post-hit. This number dampens that force.
-const hitDampening = 0.1;
-// Backboard receives shadows and is the farthest negative Z position of entities.
-const backboardZ = -400;
-const shadowColor = '#262e36';
-// How much air drag is applied to standard objects
-const airDrag = 0.022;
-const gravity = 0.3;
-// Spark config
-const sparkColor = 'rgba(170,221,255,.9)';
-const sparkThickness = 2.2;
-const airDragSpark = 0.1;
-// Track pointer positions to show trail
-const touchTrailColor = 'rgba(170,221,255,.62)';
-const touchTrailThickness = 7;
-const touchPointLife = 120;
-const touchPoints = [];
-// Size of in-game targets. This affects rendered size and hit area.
-const targetRadius = 40;
-const targetHitRadius = 50;
-const makeTargetGlueColor = target => {
-	// const alpha = (target.health - 1) / (target.maxHealth - 1);
-	// return `rgba(170,221,255,${alpha.toFixed(3)})`;
-	return 'rgb(170,221,255)';
-};
-// Size of target fragments
-const fragRadius = targetRadius / 3;
-
-
-
-// Game canvas element needed in setup.js and interaction.js
-const canvas = document.querySelector('#c');
-
-// 3D camera config
-// Affects perspective
-const cameraDistance = 900;
-// Does not affect perspective
-const sceneScale = 1;
-// Objects that get too close to the camera will be faded out to transparent over this range.
-// const cameraFadeStartZ = 0.8*cameraDistance - 6*targetRadius;
-const cameraFadeStartZ = 0.45*cameraDistance;
-const cameraFadeEndZ = 0.65*cameraDistance;
-const cameraFadeRange = cameraFadeEndZ - cameraFadeStartZ;
-
-// Globals used to accumlate all vertices/polygons in each frame
-const allVertices = [];
-const allPolys = [];
-const allShadowVertices = [];
-const allShadowPolys = [];
-
-
-
-
-// state.js
-///////////
-// Enums //
-///////////
-
-// Game Modes
-const GAME_MODE_RANKED = Symbol('GAME_MODE_RANKED');
-const GAME_MODE_CASUAL = Symbol('GAME_MODE_CASUAL');
-
-// Available Menus
-const MENU_MAIN = Symbol('MENU_MAIN');
-const MENU_PAUSE = Symbol('MENU_PAUSE');
-const MENU_SCORE = Symbol('MENU_SCORE');
-
-
-
-//////////////////
-// Global State //
-//////////////////
-
-const state = {
-	game: {
-		mode: GAME_MODE_RANKED,
-		// Run time of current game.
-		time: 0,
-		// Player score.
-		score: 0,
-		// Total number of cubes smashed in game.
-		cubeCount: 0
-	},
-	menus: {
-		// Set to `null` to hide all menus
-		active: MENU_MAIN
-	}
-};
-
-
-////////////////////////////
-// Global State Selectors //
-////////////////////////////
-
-const isInGame = () => !state.menus.active;
-const isMenuVisible = () => !!state.menus.active;
-const isCasualGame = () => state.game.mode === GAME_MODE_CASUAL;
-const isPaused = () => state.menus.active === MENU_PAUSE;
-
-
-///////////////////
-// Local Storage //
-///////////////////
-
-const highScoreKey = '__menja__highScore';
-const getHighScore = () => {
-	const raw = localStorage.getItem(highScoreKey);
-	return raw ? parseInt(raw, 10) : 0;
-};
-
-let _lastHighscore = getHighScore();
-const setHighScore = score => {
-	_lastHighscore = getHighScore();
-	localStorage.setItem(highScoreKey, String(score));
-};
-
-const isNewHighScore = () => state.game.score > _lastHighscore;
-
-
-/////////
-// DOM //
-/////////
-
-const $ = selector => document.querySelector(selector);
-const handleClick = (element, handler) => element.addEventListener('click', handler);
-const handlePointerDown = (element, handler) => {
-	element.addEventListener('touchstart', handler);
-	element.addEventListener('mousedown', handler);
-};
-
-
-
-////////////////////////
-// Formatting Helpers //
-////////////////////////
-
-// Converts a number into a formatted string with thousand separators.
-const formatNumber = num => num.toLocaleString();
-
-
-////////////////////
-// Math Constants //
-////////////////////
-
-const PI = Math.PI;
-const TAU = Math.PI * 2;
-const ETA = Math.PI * 0.5;
-
-//////////////////
-// Math Helpers //
-//////////////////
-
-// Clamps a number between min and max values (inclusive)
-const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
-
-// Linearly interpolate between numbers a and b by a specific amount.
-// mix >= 0 && mix <= 1
-const lerp = (a, b, mix) => (b - a) * mix + a;
-
-////////////////////
-// Random Helpers //
-////////////////////
-
-// Generates a random number between min (inclusive) and max (exclusive)
-const random = (min, max) => Math.random() * (max - min) + min;
-
-// Generates a random integer between and possibly including min and max values
-const randomInt = (min, max) => ((Math.random() * (max - min + 1)) | 0) + min;
-
-// Returns a random element from an array
-const pickOne = arr => arr[Math.random() * arr.length | 0];
-
-
-///////////////////
-// Color Helpers //
-///////////////////
-
-// Converts an { r, g, b } color object to a 6-digit hex code.
-const colorToHex = color => {
-	return '#' +
-		(color.r | 0).toString(16).padStart(2, '0') +
-		(color.g | 0).toString(16).padStart(2, '0') +
-		(color.b | 0).toString(16).padStart(2, '0');
-};
-
-// Operates on an { r, g, b } color object.
-// Returns string hex code.
-// `lightness` must range from 0 to 1. 0 is pure black, 1 is pure white.
-const shadeColor = (color, lightness) => {
-	let other, mix;
-	if (lightness < 0.5) {
-		other = 0;
-		mix = 1 - (lightness * 2);
-	} else {
-		other = 255;
-		mix = lightness * 2 - 1;
-	}
-	return '#' +
-		(lerp(color.r, other, mix) | 0).toString(16).padStart(2, '0') +
-		(lerp(color.g, other, mix) | 0).toString(16).padStart(2, '0') +
-		(lerp(color.b, other, mix) | 0).toString(16).padStart(2, '0');
-};
-
-////////////////////
-// Timing Helpers //
-////////////////////
-
-const _allCooldowns = [];
-
-const makeCooldown = (rechargeTime, units=1) => {
-	let timeRemaining = 0;
-	let lastTime = 0;
-
-	const initialOptions = { rechargeTime, units };
-
-	const updateTime = () => {
-		const now = state.game.time;
-		// Reset time remaining if time goes backwards.
-		if (now < lastTime) {
-			timeRemaining = 0;
-		} else {
-			// update...
-			timeRemaining -= now-lastTime;
-			if (timeRemaining < 0) timeRemaining = 0;
-		}
-		lastTime = now;
-	};
-
-	const canUse = () => {
-		updateTime();
-		return timeRemaining <= (rechargeTime * (units-1));
-	};
-
-	const cooldown = {
-		canUse,
-		useIfAble() {
-			const usable = canUse();
-			if (usable) timeRemaining += rechargeTime;
-			return usable;
-		},
-		mutate(options) {
-			if (options.rechargeTime) {
-				// Apply recharge time delta so change takes effect immediately.
-				timeRemaining -= rechargeTime-options.rechargeTime;
-				if (timeRemaining < 0) timeRemaining = 0;
-				rechargeTime = options.rechargeTime;
-			}
-			if (options.units) units = options.units;
-		},
-		reset() {
-			timeRemaining = 0;
-			lastTime = 0;
-			this.mutate(initialOptions);
-		}
-	};
-
-	_allCooldowns.push(cooldown);
-
-	return cooldown;
-};
-
-const resetAllCooldowns = () => _allCooldowns.forEach(cooldown => cooldown.reset());
-
-const makeSpawner = ({ chance, cooldownPerSpawn, maxSpawns }) => {
-	const cooldown = makeCooldown(cooldownPerSpawn, maxSpawns);
-	return {
-		shouldSpawn() {
-			return Math.random() <= chance && cooldown.useIfAble();
-		},
-		mutate(options) {
-			if (options.chance) chance = options.chance;
-			cooldown.mutate({
-				rechargeTime: options.cooldownPerSpawn,
-				units: options.maxSpawns
-			});
-		}
-	};
-};
-
-////////////////////
-// Vector Helpers //
-////////////////////
-
-const normalize = v => {
-	const mag = Math.hypot(v.x, v.y, v.z);
-	return {
-		x: v.x / mag,
-		y: v.y / mag,
-		z: v.z / mag
-	};
-}
-
-// Curried math helpers
-const add = a => b => a + b;
-// Curried vector helpers
-const scaleVector = scale => vector => {
-	vector.x *= scale;
-	vector.y *= scale;
-	vector.z *= scale;
-};
-
-////////////////
-// 3D Helpers //
-////////////////
-
-// Clone array and all vertices.
-function cloneVertices(vertices) {
-	return vertices.map(v => ({ x: v.x, y: v.y, z: v.z }));
-}
-
-// Copy vertex data from one array into another.
-// Arrays must be the same length.
-function copyVerticesTo(arr1, arr2) {
-	const len = arr1.length;
-	for (let i=0; i<len; i++) {
-		const v1 = arr1[i];
-		const v2 = arr2[i];
-		v2.x = v1.x;
-		v2.y = v1.y;
-		v2.z = v1.z;
-	}
-}
-
-// Compute triangle midpoint.
-// Mutates `middle` property of given `poly`.
-function computeTriMiddle(poly) {
-	const v = poly.vertices;
-	poly.middle.x = (v[0].x + v[1].x + v[2].x) / 3;
-	poly.middle.y = (v[0].y + v[1].y + v[2].y) / 3;
-	poly.middle.z = (v[0].z + v[1].z + v[2].z) / 3;
-}
-
-// Compute quad midpoint.
-// Mutates `middle` property of given `poly`.
-function computeQuadMiddle(poly) {
-	const v = poly.vertices;
-	poly.middle.x = (v[0].x + v[1].x + v[2].x + v[3].x) / 4;
-	poly.middle.y = (v[0].y + v[1].y + v[2].y + v[3].y) / 4;
-	poly.middle.z = (v[0].z + v[1].z + v[2].z + v[3].z) / 4;
-}
-
-function computePolyMiddle(poly) {
-	if (poly.vertices.length === 3) {
-		computeTriMiddle(poly);
-	} else {
-		computeQuadMiddle(poly);
-	}
-}
-
-// Compute distance from any polygon (tri or quad) midpoint to camera.
-// Sets `depth` property of given `poly`.
-// Also triggers midpoint calculation, which mutates `middle` property of `poly`.
-function computePolyDepth(poly) {
-	computePolyMiddle(poly);
-	const dX = poly.middle.x;
-	const dY = poly.middle.y;
-	const dZ = poly.middle.z - cameraDistance;
-	poly.depth = Math.hypot(dX, dY, dZ);
-}
-
-// Compute normal of any polygon. Uses normalized vector cross product.
-// Mutates `normalName` property of given `poly`.
-function computePolyNormal(poly, normalName) {
-	// Store quick refs to vertices
-	const v1 = poly.vertices[0];
-	const v2 = poly.vertices[1];
-	const v3 = poly.vertices[2];
-	// Calculate difference of vertices, following winding order.
-	const ax = v1.x - v2.x;
-	const ay = v1.y - v2.y;
-	const az = v1.z - v2.z;
-	const bx = v1.x - v3.x;
-	const by = v1.y - v3.y;
-	const bz = v1.z - v3.z;
-	// Cross product
-	const nx = ay*bz - az*by;
-	const ny = az*bx - ax*bz;
-	const nz = ax*by - ay*bx;
-	// Compute magnitude of normal and normalize
-	const mag = Math.hypot(nx, ny, nz);
-	const polyNormal = poly[normalName];
-	polyNormal.x = nx / mag;
-	polyNormal.y = ny / mag;
-	polyNormal.z = nz / mag;
-}
-
-// Apply translation/rotation/scale to all given vertices.
-// If `vertices` and `target` are the same array, the vertices will be mutated in place.
-// If `vertices` and `target` are different arrays, `vertices` will not be touched, instead the
-// transformed values from `vertices` will be written to `target` array.
-function transformVertices(vertices, target, tX, tY, tZ, rX, rY, rZ, sX, sY, sZ) {
-	// Matrix multiplcation constants only need calculated once for all vertices.
-	const sinX = Math.sin(rX);
-	const cosX = Math.cos(rX);
-	const sinY = Math.sin(rY);
-	const cosY = Math.cos(rY);
-	const sinZ = Math.sin(rZ);
-	const cosZ = Math.cos(rZ);
-
-	// Using forEach() like map(), but with a (recycled) target array.
-	vertices.forEach((v, i) => {
-		const targetVertex = target[i];
-		// X axis rotation
-		const x1 = v.x;
-		const y1 = v.z*sinX + v.y*cosX;
-		const z1 = v.z*cosX - v.y*sinX;
-		// Y axis rotation
-		const x2 = x1*cosY - z1*sinY;
-		const y2 = y1;
-		const z2 = x1*sinY + z1*cosY;
-		// Z axis rotation
-		const x3 = x2*cosZ - y2*sinZ;
-		const y3 = x2*sinZ + y2*cosZ;
-		const z3 = z2;
-
-		// Scale, Translate, and set the transform.
-		targetVertex.x = x3 * sX + tX;
-		targetVertex.y = y3 * sY + tY;
-		targetVertex.z = z3 * sZ + tZ;
-	});
-}
-
-// 3D projection on a single vertex.
-// Directly mutates the vertex.
-const projectVertex = v => {
-	const focalLength = cameraDistance * sceneScale;
-	const depth = focalLength / (cameraDistance - v.z);
-	v.x = v.x * depth;
-	v.y = v.y * depth;
-};
-
-// 3D projection on a single vertex.
-// Mutates a secondary target vertex.
-const projectVertexTo = (v, target) => {
-	const focalLength = cameraDistance * sceneScale;
-	const depth = focalLength / (cameraDistance - v.z);
-	target.x = v.x * depth;
-	target.y = v.y * depth;
-};
-
-// PERF.js
-// Dummy no-op functions.
-// I use these in a special build for custom performance profiling.
-const PERF_START = () => {};
-const PERF_END = () => {};
-const PERF_UPDATE = () => {};
-
-
-
-
-// 3dModels.js
-// Define models once. The origin is the center of the model.
-
-// A simple cube, 8 vertices, 6 quads.
-// Defaults to an edge length of 2 units, can be influenced with `scale`.
-function makeCubeModel({ scale=1 }) {
-	return {
-		vertices: [
-			// top
-			{ x: -scale, y: -scale, z: scale },
-			{ x:  scale, y: -scale, z: scale },
-			{ x:  scale, y:  scale, z: scale },
-			{ x: -scale, y:  scale, z: scale },
-			// bottom
-			{ x: -scale, y: -scale, z: -scale },
-			{ x:  scale, y: -scale, z: -scale },
-			{ x:  scale, y:  scale, z: -scale },
-			{ x: -scale, y:  scale, z: -scale }
-		],
-		polys: [
-			// z = 1
-			{ vIndexes: [0, 1, 2, 3] },
-			// z = -1
-			{ vIndexes: [7, 6, 5, 4] },
-			// y = 1
-			{ vIndexes: [3, 2, 6, 7] },
-			// y = -1
-			{ vIndexes: [4, 5, 1, 0] },
-			// x = 1
-			{ vIndexes: [5, 6, 2, 1] },
-			// x = -1
-			{ vIndexes: [0, 3, 7, 4] }
-		]
-	};
-}
-
-// Not very optimized - lots of duplicate vertices are generated.
-function makeRecursiveCubeModel({ recursionLevel, splitFn, color, scale=1 }) {
-	const getScaleAtLevel = level => 1 / (3 ** level);
-
-	// We can model level 0 manually. It's just a single, centered, cube.
-	let cubeOrigins = [{ x: 0, y: 0, z: 0 }];
-
-	// Recursively replace cubes with smaller cubes.
-	for (let i=1; i<=recursionLevel; i++) {
-		const scale = getScaleAtLevel(i) * 2;
-		const cubeOrigins2 = [];
-		cubeOrigins.forEach(origin => {
-			cubeOrigins2.push(...splitFn(origin, scale));
-		});
-		cubeOrigins = cubeOrigins2;
-	}
-
-	const finalModel = { vertices: [], polys: [] };
-
-	// Generate single cube model and scale it.
-	const cubeModel = makeCubeModel({ scale: 1 });
-	cubeModel.vertices.forEach(scaleVector(getScaleAtLevel(recursionLevel)));
-
-	// Compute the max distance x, y, or z origin values will be.
-	// Same result as `Math.max(...cubeOrigins.map(o => o.x))`, but much faster.
-	const maxComponent = getScaleAtLevel(recursionLevel) * (3 ** recursionLevel - 1);
-
-	// Place cube geometry at each origin.
-	cubeOrigins.forEach((origin, cubeIndex) => {
-		// To compute occlusion (shading), find origin component with greatest
-		// magnitude and normalize it relative to `maxComponent`.
-		const occlusion = Math.max(
-			Math.abs(origin.x),
-			Math.abs(origin.y),
-			Math.abs(origin.z)
-		) / maxComponent;
-		// At lower iterations, occlusion looks better lightened up a bit.
-		const occlusionLighter = recursionLevel > 2
-			? occlusion
-			: (occlusion + 0.8) / 1.8;
-		// Clone, translate vertices to origin, and apply scale
-		finalModel.vertices.push(
-			...cubeModel.vertices.map(v => ({
-				x: (v.x + origin.x) * scale,
-				y: (v.y + origin.y) * scale,
-				z: (v.z + origin.z) * scale
-			}))
-		);
-		// Clone polys, shift referenced vertex indexes, and compute color.
-		finalModel.polys.push(
-			...cubeModel.polys.map(poly => ({
-				vIndexes: poly.vIndexes.map(add(cubeIndex * 8))
-			}))
-		);
-	});
-
-	return finalModel;
-}
-
-
-// o: Vector3D - Position of cube's origin (center).
-// s: Vector3D - Determines size of menger sponge.
-function mengerSpongeSplit(o, s) {
-	return [
-		// Top
-		{ x: o.x + s, y: o.y - s, z: o.z + s },
-		{ x: o.x + s, y: o.y - s, z: o.z + 0 },
-		{ x: o.x + s, y: o.y - s, z: o.z - s },
-		{ x: o.x + 0, y: o.y - s, z: o.z + s },
-		{ x: o.x + 0, y: o.y - s, z: o.z - s },
-		{ x: o.x - s, y: o.y - s, z: o.z + s },
-		{ x: o.x - s, y: o.y - s, z: o.z + 0 },
-		{ x: o.x - s, y: o.y - s, z: o.z - s },
-		// Bottom
-		{ x: o.x + s, y: o.y + s, z: o.z + s },
-		{ x: o.x + s, y: o.y + s, z: o.z + 0 },
-		{ x: o.x + s, y: o.y + s, z: o.z - s },
-		{ x: o.x + 0, y: o.y + s, z: o.z + s },
-		{ x: o.x + 0, y: o.y + s, z: o.z - s },
-		{ x: o.x - s, y: o.y + s, z: o.z + s },
-		{ x: o.x - s, y: o.y + s, z: o.z + 0 },
-		{ x: o.x - s, y: o.y + s, z: o.z - s },
-		// Middle
-		{ x: o.x + s, y: o.y + 0, z: o.z + s },
-		{ x: o.x + s, y: o.y + 0, z: o.z - s },
-		{ x: o.x - s, y: o.y + 0, z: o.z + s },
-		{ x: o.x - s, y: o.y + 0, z: o.z - s }
-	];
-}
-
-
-
-// Helper to optimize models by merging duplicate vertices within a threshold,
-// and removing all polys that share the same vertices.
-// Directly mutates the model.
-function optimizeModel(model, threshold=0.0001) {
-	const { vertices, polys } = model;
-
-	const compareVertices = (v1, v2) => (
-		Math.abs(v1.x - v2.x) < threshold &&
-		Math.abs(v1.y - v2.y) < threshold &&
-		Math.abs(v1.z - v2.z) < threshold
-	);
-
-	const comparePolys = (p1, p2) => {
-		const v1 = p1.vIndexes;
-		const v2 = p2.vIndexes;
-		return (
-			(
-				v1[0] === v2[0] ||
-				v1[0] === v2[1] ||
-				v1[0] === v2[2] ||
-				v1[0] === v2[3]
-			) && (
-				v1[1] === v2[0] ||
-				v1[1] === v2[1] ||
-				v1[1] === v2[2] ||
-				v1[1] === v2[3]
-			) && (
-				v1[2] === v2[0] ||
-				v1[2] === v2[1] ||
-				v1[2] === v2[2] ||
-				v1[2] === v2[3]
-			) && (
-				v1[3] === v2[0] ||
-				v1[3] === v2[1] ||
-				v1[3] === v2[2] ||
-				v1[3] === v2[3]
-			)
-		);
-	};
-
-
-	vertices.forEach((v, i) => {
-		v.originalIndexes = [i];
-	});
-
-	for (let i=vertices.length-1; i>=0; i--) {
-		for (let ii=i-1; ii>=0; ii--) {
-			const v1 = vertices[i];
-			const v2 = vertices[ii];
-			if (compareVertices(v1, v2)) {
-				vertices.splice(i, 1);
-				v2.originalIndexes.push(...v1.originalIndexes);
-				break;
-			}
-		}
-	}
-
-	vertices.forEach((v, i) => {
-		polys.forEach(p => {
-			p.vIndexes.forEach((vi, ii, arr) => {
-				const vo = v.originalIndexes;
-				if (vo.includes(vi)) {
-					arr[ii] = i;
-				}
-			});
-		});
-	});
-
-	polys.forEach(p => {
-		const vi = p.vIndexes;
-		p.sum = vi[0] + vi[1] + vi[2] + vi[3];
-	});
-	polys.sort((a, b) => b.sum - a.sum);
-
-	// Assumptions:
-	// 1. Each poly will either have no duplicates or 1 duplicate.
-	// 2. If two polys are equal, they are both hidden (two cubes touching),
-	//    therefore both can be removed.
-	for (let i=polys.length-1; i>=0; i--) {
-		for (let ii=i-1; ii>=0; ii--) {
-			const p1 = polys[i];
-			const p2 = polys[ii];
-			if (p1.sum !== p2.sum) break;
-			if (comparePolys(p1, p2)) {
-				polys.splice(i, 1);
-				polys.splice(ii, 1);
-				i--;
-				break;
-			}
-		}
-	}
-
-	return model;
-}
-
-
-
-
-
-// Entity.js
-
-class Entity {
-	constructor({ model, color, wireframe=false }) {
-		const vertices = cloneVertices(model.vertices);
-		const shadowVertices = cloneVertices(model.vertices);
-		const colorHex = colorToHex(color);
-		const darkColorHex = shadeColor(color, 0.4);
-
-		const polys = model.polys.map(p => ({
-			vertices: p.vIndexes.map(vIndex => vertices[vIndex]),
-			color: color, // custom rgb color object
-			wireframe: wireframe,
-			strokeWidth: wireframe ? 2 : 0, // Set to non-zero value to draw stroke
-			strokeColor: colorHex, // must be a CSS color string
-			strokeColorDark: darkColorHex, // must be a CSS color string
-			depth: 0,
-			middle: { x: 0, y: 0, z: 0 },
-			normalWorld: { x: 0, y: 0, z: 0 },
-			normalCamera: { x: 0, y: 0, z: 0 }
-		}));
-
-		const shadowPolys = model.polys.map(p => ({
-			vertices: p.vIndexes.map(vIndex => shadowVertices[vIndex]),
-			wireframe: wireframe,
-			normalWorld: { x: 0, y: 0, z: 0 }
-		}));
-
-		this.projected = {}; // Will store 2D projected data
-		this.model = model;
-		this.vertices = vertices;
-		this.polys = polys;
-		this.shadowVertices = shadowVertices;
-		this.shadowPolys = shadowPolys;
-		this.reset();
-	}
-
-	// Better names: resetEntity, resetTransform, resetEntityTransform
-	reset() {
-		this.x = 0;
-		this.y = 0;
-		this.z = 0;
-		this.xD = 0;
-		this.yD = 0;
-		this.zD = 0;
-
-		this.rotateX = 0;
-		this.rotateY = 0;
-		this.rotateZ = 0;
-		this.rotateXD = 0;
-		this.rotateYD = 0;
-		this.rotateZD = 0;
-
-		this.scaleX = 1;
-		this.scaleY = 1;
-		this.scaleZ = 1;
-
-		this.projected.x = 0;
-		this.projected.y = 0;
-	}
-
-	transform() {
-		transformVertices(
-			this.model.vertices,
-			this.vertices,
-			this.x,
-			this.y,
-			this.z,
-			this.rotateX,
-			this.rotateY,
-			this.rotateZ,
-			this.scaleX,
-			this.scaleY,
-			this.scaleZ
-		);
-
-		copyVerticesTo(this.vertices, this.shadowVertices);
-	}
-
-	// Projects origin point, stored as `projected` property.
-	project() {
-		projectVertexTo(this, this.projected);
-	}
-}
-
-// getTarget.js
-// All active targets
-const targets = [];
-
-// Pool target instances by color, using a Map.
-// keys are color objects, and values are arrays of targets.
-// Also pool wireframe instances separately.
-const targetPool = new Map(allColors.map(c=>([c, []])));
-const targetWireframePool = new Map(allColors.map(c=>([c, []])));
-
-
-
-const getTarget = (() => {
-
-	const slowmoSpawner = makeSpawner({
-		chance: 0.5,
-		cooldownPerSpawn: 10000,
-		maxSpawns: 1
-	});
-
-	let doubleStrong = false;
-	const strongSpawner = makeSpawner({
-		chance: 0.3,
-		cooldownPerSpawn: 12000,
-		maxSpawns: 1
-	});
-
-	const spinnerSpawner = makeSpawner({
-		chance: 0.1,
-		cooldownPerSpawn: 10000,
-		maxSpawns: 1
-	});
-
-	// Cached array instances, no need to allocate every time.
-	const axisOptions = [
-		['x', 'y'],
-		['y', 'z'],
-		['z', 'x']
-	];
-
-	function getTargetOfStyle(color, wireframe) {
-		const pool = wireframe ? targetWireframePool : targetPool;
-		let target = pool.get(color).pop();
-		if (!target) {
-			target = new Entity({
-				model: optimizeModel(makeRecursiveCubeModel({
-					recursionLevel: 1,
-					splitFn: mengerSpongeSplit,
-					scale: targetRadius
-				})),
-				color: color,
-				wireframe: wireframe
-			});
-
-			// Init any properties that will be used.
-			// These will not be automatically reset when recycled.
-			target.color = color;
-			target.wireframe = wireframe;
-			// Some properties don't have their final value yet.
-			// Initialize with any value of the right type.
-			target.hit = false;
-			target.maxHealth = 0;
-			target.health = 0;
-		}
-		return target;
-	}
-
-	return function getTarget() {
-		if (doubleStrong && state.game.score <= doubleStrongEnableScore) {
-			doubleStrong = false;
-			// Spawner is reset automatically when game resets.
-		} else if (!doubleStrong && state.game.score > doubleStrongEnableScore) {
-			doubleStrong = true;
-			strongSpawner.mutate({ maxSpawns: 2 });
-		}
-
-		// Target Parameters
-		// --------------------------------
-		let color = pickOne([BLUE, GREEN, ORANGE]);
-		let wireframe = false;
-		let health = 1;
-		let maxHealth = 3;
-		const spinner = state.game.cubeCount >= spinnerThreshold && isInGame() && spinnerSpawner.shouldSpawn();
-
-		// Target Parameter Overrides
-		// --------------------------------
-		if (state.game.cubeCount >= slowmoThreshold && slowmoSpawner.shouldSpawn()) {
-			color = BLUE;
-			wireframe = true;
-		}
-		else if (state.game.cubeCount >= strongThreshold && strongSpawner.shouldSpawn()) {
-			color = PINK;
-			health = 3;
-		}
-
-		// Target Creation
-		// --------------------------------
-		const target = getTargetOfStyle(color, wireframe);
-		target.hit = false;
-		target.maxHealth = maxHealth;
-		target.health = health;
-		updateTargetHealth(target, 0);
-
-		const spinSpeeds = [
-			Math.random() * 0.1 - 0.05,
-			Math.random() * 0.1 - 0.05
-		];
-
-		if (spinner) {
-			// Ends up spinning a random axis
-			spinSpeeds[0] = -0.25;
-			spinSpeeds[1] = 0;
-			target.rotateZ = random(0, TAU);
-		}
-
-		const axes = pickOne(axisOptions);
-
-		spinSpeeds.forEach((spinSpeed, i) => {
-			switch (axes[i]) {
-				case 'x':
-					target.rotateXD = spinSpeed;
-					break;
-				case 'y':
-					target.rotateYD = spinSpeed;
-					break;
-				case 'z':
-					target.rotateZD = spinSpeed;
-					break;
-			}
-		});
-
-		return target;
-	}
+// ============================================================
+// Fruit Ninja 3D — Three.js
+// ============================================================
+
+(function () {
+  'use strict';
+
+  // ---- Constants ----
+  const GRAVITY = -12;
+  const MAX_MISSES = 5;
+  const SPAWN_INTERVAL_MIN = 1400;
+  const SPAWN_INTERVAL_MAX = 3000;
+  const FRUIT_TYPES = ['watermelon', 'orange'];
+
+  // ---- Slow-Mo (reference: index.js pattern) ----
+  const SLOWMO_DURATION = 1500;       // ms of slow-mo
+  const SLOWMO_COOLDOWN = 8000;       // ms cooldown before slow-mo can trigger again
+  const SLOWMO_TIME_SCALE = 0.3;      // target gameSpeed during slow-mo
+  const SLOWMO_POINTER_SCALE = 0.075; // even slower while swiping in slow-mo
+  const SCORE_MILESTONE = 50;         // activate slow-mo every N points
+  let slowmoRemaining = 0;            // ms remaining
+  let slowmoCooldown = 0;             // ms cooldown remaining
+  let gameSpeed = 1;                  // current time multiplier (lerps)
+  let lastMilestone = 0;              // last milestone score crossed
+
+  // ---- State ----
+  let score = 0;
+  let misses = 0;
+  let comboCount = 0;
+  let comboTimer = 0;
+  let gameRunning = false;
+  let spawnTimer = 0;
+  let nextSpawnDelay = 1000;
+  let clock;
+
+  // ---- Squidly API Integration ----
+  const squidly = window.SquidlyAPI || null;
+
+
+  // ---- Squidly Cursor/Gaze Listener (alternative slicing input) ----
+  let gazePrevX = null;
+  let gazePrevY = null;
+  let gazeTrailActive = false;
+
+  if (squidly) {
+    squidly.addCursorListener((data) => {
+      if (!gameRunning) return;
+      const x = data.x;
+      const y = data.y;
+
+      if (gazePrevX !== null && gazePrevY !== null) {
+        const dx = x - gazePrevX;
+        const dy = y - gazePrevY;
+        const speed = Math.sqrt(dx * dx + dy * dy);
+
+        // Treat gaze movement as a continuous swipe
+        if (speed > 2) {
+          gazeTrailActive = true;
+          trail.push({ x, y, time: performance.now() });
+          while (trail.length > TRAIL_LENGTH) trail.shift();
+
+          // Raycast at gaze position
+          pointerNDC.x = (x / window.innerWidth) * 2 - 1;
+          pointerNDC.y = -(y / window.innerHeight) * 2 + 1;
+          raycaster.setFromCamera(pointerNDC, camera);
+
+          for (let i = fruits.length - 1; i >= 0; i--) {
+            const fruit = fruits[i];
+            if (fruit.userData.sliced) continue;
+            const fruitPos = fruit.position.clone();
+            const dist = raycaster.ray.distanceToPoint(fruitPos);
+
+            if (dist < 1.8) {
+              // BOMB CHECK (gaze)
+              if (fruit.userData.isBomb) {
+                fruit.userData.sliced = true;
+                spawnExplosion(fruit.position.clone());
+                scene.remove(fruit);
+                fruits.splice(i, 1);
+                endGame(true);
+                return;
+              }
+
+              fruit.userData.sliced = true;
+              const name = fruit.userData.fruitName;
+              const pts = fruitScores[name] || 10;
+              score += pts;
+
+              comboCount++;
+              comboTimer = 0.5;
+              if (comboCount >= 3) {
+                const comboBonus = comboCount * 5;
+                score += comboBonus;
+                comboLabel.textContent = `🔥 ${comboCount}x COMBO! +${comboBonus}`;
+                comboLabel.style.opacity = '1';
+              }
+              updateScore();
+
+              const sliceDir = dx > 0 ? 1 : -1;
+              createHalf(fruit, sliceDir, dx, dy);
+              createHalf(fruit, -sliceDir, dx, dy);
+              spawnJuice(fruit.position, fruit.userData.juiceColor, 20);
+              spawnJuice(fruit.position, fruit.userData.fruitColor, 10);
+
+              scene.remove(fruit);
+              fruits.splice(i, 1);
+            }
+          }
+        } else {
+          gazeTrailActive = false;
+        }
+      }
+
+      gazePrevX = x;
+      gazePrevY = y;
+    });
+  }
+
+  // ---- Squidly Firebase High Score ----
+  let highScore = 0;
+
+  function loadHighScore() {
+    if (!squidly) return;
+    squidly.firebaseOnValue("game/highScore", (val) => {
+      if (val !== null && val !== undefined) {
+        highScore = val;
+      }
+    });
+  }
+
+  function saveHighScore() {
+    if (!squidly) return;
+    if (score > highScore) {
+      highScore = score;
+      squidly.firebaseSet("game/highScore", highScore);
+    }
+  }
+
+  loadHighScore();
+
+  // ---- DOM ----
+  const scoreLabel = document.getElementById('score-label');
+  const comboLabel = document.getElementById('combo-label');
+  const missLabel = document.getElementById('miss-label');
+  const menuMain = document.getElementById('menu-main');
+  const menuGameover = document.getElementById('menu-gameover');
+  const finalScoreEl = document.getElementById('final-score');
+  const trailCanvas = document.getElementById('trail-canvas');
+  const trailCtx = trailCanvas.getContext('2d');
+
+  // ---- Three.js Setup ----
+  const scene = new THREE.Scene();
+
+  // Background gradient via hemisphere light + fog color
+  scene.background = new THREE.Color(0x1a0a2e);
+  scene.fog = new THREE.Fog(0x1a0a2e, 40, 80);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 5, 18);
+  camera.lookAt(0, 5, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+  // ---- Lighting ----
+  const ambientLight = new THREE.AmbientLight(0x8888cc, 0.5);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+  dirLight.position.set(5, 15, 10);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  scene.add(dirLight);
+
+  const rimLight = new THREE.DirectionalLight(0x4488ff, 0.4);
+  rimLight.position.set(-5, 5, -10);
+  scene.add(rimLight);
+
+  // ---- Procedural environment map for realistic reflections ----
+  const envScene = new THREE.Scene();
+  const envGeo = new THREE.BoxGeometry(20, 20, 20);
+  const envMats = [
+    new THREE.MeshBasicMaterial({ color: 0x556688, side: THREE.BackSide }),
+    new THREE.MeshBasicMaterial({ color: 0x445577, side: THREE.BackSide }),
+    new THREE.MeshBasicMaterial({ color: 0x99aabb, side: THREE.BackSide }), // top (sky)
+    new THREE.MeshBasicMaterial({ color: 0x222233, side: THREE.BackSide }), // bottom
+    new THREE.MeshBasicMaterial({ color: 0x667799, side: THREE.BackSide }),
+    new THREE.MeshBasicMaterial({ color: 0x556688, side: THREE.BackSide }),
+  ];
+  envScene.add(new THREE.Mesh(envGeo, envMats));
+  // Bright spot for specular highlight
+  const spotGeo = new THREE.SphereGeometry(1.5, 8, 8);
+  const spotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const spotMesh = new THREE.Mesh(spotGeo, spotMat);
+  spotMesh.position.set(5, 8, 6);
+  envScene.add(spotMesh);
+
+  const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(128, {
+    format: THREE.RGBAFormat, generateMipmaps: true,
+    minFilter: THREE.LinearMipmapLinearFilter
+  });
+  const cubeCamera = new THREE.CubeCamera(0.1, 30, cubeRenderTarget);
+  cubeCamera.update(renderer, envScene);
+  const envMap = cubeRenderTarget.texture;
+
+  // ---- Fruit Geometry Builders ----
+
+  function createApple() {
+    const group = new THREE.Group();
+    // Body — lathe with more segments for smoother shape
+    const pts = [];
+    for (let i = 0; i <= 32; i++) {
+      const t = i / 32;
+      const angle = t * Math.PI;
+      let r = Math.sin(angle) * 0.7;
+      // Wider bottom lobe
+      if (t > 0.4 && t < 0.8) r *= 1.05;
+      // Indent top (stem cavity)
+      if (t < 0.15) r *= 0.5 + t * 3.0;
+      // Indent bottom
+      if (t > 0.9) r *= 1 - (t - 0.9) * 5;
+      pts.push(new THREE.Vector2(r, t * 1.2 - 0.6));
+    }
+    const bodyGeo = new THREE.LatheGeometry(pts, 36);
+
+    // Vertex colors — red body with green-yellow near the top
+    const colors = [];
+    const posAttr = bodyGeo.attributes.position;
+    for (let i = 0; i < posAttr.count; i++) {
+      const y = posAttr.getY(i);
+      const x = posAttr.getX(i);
+      const z = posAttr.getZ(i);
+      const normalizedY = (y + 0.6) / 1.2; // 0 = bottom, 1 = top
+
+      // Base deep red
+      let r = 0.78, g = 0.06, b = 0.04;
+
+      // Green-yellow blush near stem (top)
+      if (normalizedY > 0.7) {
+        const blend = (normalizedY - 0.7) / 0.3;
+        r = r * (1 - blend * 0.6) + 0.45 * blend * 0.6;
+        g = g * (1 - blend * 0.6) + 0.55 * blend * 0.6;
+        b = b * (1 - blend * 0.4) + 0.12 * blend * 0.4;
+      }
+
+      // Subtle streaky variation based on angle
+      const angle = Math.atan2(z, x);
+      const streak = Math.sin(angle * 5) * 0.06;
+      r = Math.min(1, Math.max(0, r + streak));
+
+      // Slight bright highlight near equator
+      if (normalizedY > 0.35 && normalizedY < 0.65) {
+        r = Math.min(1, r + 0.05);
+      }
+
+      colors.push(r, g, b);
+    }
+    bodyGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const bodyMat = new THREE.MeshPhysicalMaterial({
+      vertexColors: true,
+      roughness: 0.25,
+      metalness: 0.0,
+      clearcoat: 0.7,
+      clearcoatRoughness: 0.15,
+      envMap: envMap,
+      envMapIntensity: 0.5,
+    });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.castShadow = true;
+    group.add(body);
+
+    // Stem — tapered cylinder with slight bend
+    const stemGeo = new THREE.CylinderGeometry(0.025, 0.04, 0.32, 8);
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x4a2e12, roughness: 0.9 });
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    stem.position.y = 0.6;
+    stem.rotation.z = 0.18;
+    group.add(stem);
+
+    // Leaf — more detailed with a vein
+    const leafShape = new THREE.Shape();
+    leafShape.moveTo(0, 0);
+    leafShape.bezierCurveTo(0.05, 0.1, 0.18, 0.16, 0.28, 0.02);
+    leafShape.bezierCurveTo(0.18, 0.08, 0.06, -0.02, 0, 0);
+    const leafGeo = new THREE.ShapeGeometry(leafShape);
+    const leafMat = new THREE.MeshPhysicalMaterial({
+      color: 0x2d8c2d,
+      roughness: 0.4,
+      side: THREE.DoubleSide,
+      clearcoat: 0.3,
+    });
+    const leaf = new THREE.Mesh(leafGeo, leafMat);
+    leaf.position.set(0.06, 0.68, 0);
+    leaf.rotation.z = -0.35;
+    group.add(leaf);
+
+    group.userData.juiceColor = 0xffeeee;
+    group.userData.fruitColor = 0xcc1111;
+    group.userData.fleshColor = 0xfff9c4;
+    group.userData.skinColor = 0xcc1111;
+    group.userData.seedColor = 0x5d4037;
+    group.userData.fruitRadius = 0.95;
+    group.userData.fruitName = 'apple';
+    group.scale.setScalar(2.025);
+    return group;
+  }
+
+  function createOrange() {
+    const group = new THREE.Group();
+
+    if (orangeWholeModel) {
+      const model = orangeWholeModel.clone(true);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      // Auto-center and auto-scale
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) {
+        wrapper.scale.setScalar(1.2 / maxDim);
+      }
+      group.add(wrapper);
+    } else {
+      // Fallback — simple orange sphere
+      const bodyGeo = new THREE.SphereGeometry(0.65, 36, 28);
+      const bodyMat = new THREE.MeshPhysicalMaterial({
+        color: 0xff8c00, roughness: 0.55, clearcoat: 0.2,
+        envMap: envMap, envMapIntensity: 0.25,
+      });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.castShadow = true;
+      group.add(body);
+    }
+
+    group.userData.juiceColor = 0xffcc44;
+    group.userData.fruitColor = 0xff8c00;
+    group.userData.fleshColor = 0xffa726;
+    group.userData.skinColor = 0xff8c00;
+    group.userData.seedColor = 0xffffff;
+    group.userData.fruitRadius = 0.88;
+    group.userData.fruitName = 'orange';
+    group.scale.setScalar(2.025);
+    return group;
+  }
+
+  function createBanana() {
+    const group = new THREE.Group();
+    // Curved banana using tube geometry along a curve
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.5, -0.3, 0),
+      new THREE.Vector3(-0.2, 0.1, 0.05),
+      new THREE.Vector3(0.15, 0.35, 0.05),
+      new THREE.Vector3(0.5, 0.5, 0)
+    ]);
+    const tubeGeo = new THREE.TubeGeometry(curve, 28, 0.18, 14, false);
+
+    // Vertex colors — yellow with green tips and brown age spots
+    const colors = [];
+    const tubePos = tubeGeo.attributes.position;
+    const segments = 28;
+    const radialSegs = 14;
+    for (let i = 0; i < tubePos.count; i++) {
+      const segIndex = Math.floor(i / (radialSegs + 1));
+      const t = segIndex / segments; // 0=start (bottom tip), 1=end (stem tip)
+
+      // Base bright yellow
+      let r = 1.0, g = 0.87, b = 0.0;
+
+      // Green tint at the ends (unripe tips)
+      if (t < 0.12) {
+        const blend = (0.12 - t) / 0.12;
+        r -= blend * 0.35;
+        g += blend * 0.05;
+        b += blend * 0.02;
+      }
+      if (t > 0.88) {
+        const blend = (t - 0.88) / 0.12;
+        r -= blend * 0.25;
+        g -= blend * 0.1;
+        b += blend * 0.02;
+      }
+
+      // Subtle brown freckles/spots
+      const px = tubePos.getX(i), py = tubePos.getY(i), pz = tubePos.getZ(i);
+      const spotNoise = Math.sin(px * 50 + py * 30) * Math.cos(pz * 40 + px * 20);
+      if (spotNoise > 0.7) {
+        const spotStrength = (spotNoise - 0.7) / 0.3 * 0.3;
+        r = Math.max(0, r - spotStrength * 0.3);
+        g = Math.max(0, g - spotStrength * 0.4);
+        b = Math.max(0, b);
+      }
+
+      // Slight longitudinal ridges (bananas have flat sides)
+      const angle = Math.atan2(pz, py) || 0;
+      const ridge = Math.abs(Math.sin(angle * 2.5)) * 0.04;
+      r = Math.min(1, r + ridge);
+      g = Math.min(1, g + ridge * 0.5);
+
+      colors.push(r, g, b);
+    }
+    tubeGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const bodyMat = new THREE.MeshPhysicalMaterial({
+      vertexColors: true,
+      roughness: 0.35,
+      metalness: 0.0,
+      clearcoat: 0.3,
+      clearcoatRoughness: 0.3,
+      envMap: envMap,
+      envMapIntensity: 0.3,
+    });
+    const body = new THREE.Mesh(tubeGeo, bodyMat);
+    body.castShadow = true;
+    group.add(body);
+
+    // Cap ends — darker brown/green tips
+    const capGeo = new THREE.SphereGeometry(0.18, 10, 10);
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x8a7a30, roughness: 0.6 });
+    const cap1 = new THREE.Mesh(capGeo, capMat);
+    cap1.position.copy(curve.getPoint(0));
+    cap1.scale.set(0.8, 0.8, 0.8);
+    group.add(cap1);
+
+    const capMat2 = new THREE.MeshStandardMaterial({ color: 0x5a4a1a, roughness: 0.7 });
+    const cap2 = new THREE.Mesh(capGeo, capMat2);
+    cap2.position.copy(curve.getPoint(1));
+    cap2.scale.set(0.6, 0.6, 0.6);
+    group.add(cap2);
+
+    // Stem tip
+    const stemGeo = new THREE.CylinderGeometry(0.04, 0.02, 0.15, 6);
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x4a3a15, roughness: 0.9 });
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    const endPoint = curve.getPoint(1);
+    stem.position.set(endPoint.x + 0.08, endPoint.y + 0.07, endPoint.z);
+    group.add(stem);
+
+    group.userData.juiceColor = 0xffffaa;
+    group.userData.fruitColor = 0xffdd00;
+    group.userData.fleshColor = 0xfff8e1;
+    group.userData.skinColor = 0xffdd00;
+    group.userData.seedColor = null;
+    group.userData.fruitRadius = 0.6;
+    group.userData.fruitName = 'banana';
+    group.scale.setScalar(2.025);
+    return group;
+  }
+
+  function createWatermelon() {
+    const group = new THREE.Group();
+
+    if (watermelonModel) {
+      const model = watermelonModel.clone(true);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      // Auto-center and auto-scale
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) {
+        wrapper.scale.setScalar(1.2 / maxDim);
+      }
+      group.add(wrapper);
+    } else {
+      // Fallback — simple green sphere
+      const bodyGeo = new THREE.SphereGeometry(0.75, 40, 28);
+      const posAttr = bodyGeo.attributes.position;
+      const colors = [];
+      for (let i = 0; i < posAttr.count; i++) {
+        const x = posAttr.getX(i);
+        const z = posAttr.getZ(i);
+        const angle = Math.atan2(z, x);
+        const stripeVal = Math.sin(angle * 8);
+        let r = 0.22, g = 0.55, b = 0.22;
+        if (stripeVal > 0) {
+          const intensity = Math.pow(stripeVal, 0.6);
+          r -= intensity * 0.07; g -= intensity * 0.12; b -= intensity * 0.07;
+        } else {
+          const li = Math.pow(-stripeVal, 0.8) * 0.4;
+          r += li * 0.15; g += li * 0.18; b += li * 0.05;
+        }
+        colors.push(Math.min(1, r), Math.min(1, g), Math.min(1, Math.max(0, b)));
+      }
+      bodyGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      const bodyMat = new THREE.MeshPhysicalMaterial({
+        vertexColors: true, roughness: 0.4, clearcoat: 0.35,
+        envMap: envMap, envMapIntensity: 0.3,
+      });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.scale.set(1, 0.85, 0.9);
+      body.castShadow = true;
+      group.add(body);
+    }
+
+    group.userData.juiceColor = 0xff6666;
+    group.userData.fruitColor = 0xcc2222;
+    group.userData.fleshColor = 0xe53935;
+    group.userData.skinColor = 0x2d7a2d;
+    group.userData.seedColor = 0x1b1b1b;
+    group.userData.fruitRadius = 1.0;
+    group.userData.fruitName = 'watermelon';
+    group.scale.setScalar(3.0);
+    return group;
+  }
+
+  // ---- GLTF Model Loaders ----
+  const gltfLoader = new THREE.GLTFLoader();
+  let dragonFruitModel = null;
+  let watermelonModel = null;
+  let watermelonHalfModel = null;
+  let orangeWholeModel = null;
+  let orangeHalfModel = null;
+  let comicalBombModel = null;
+  let fatManBombModel = null;
+
+  gltfLoader.load('3d_model/fresh_orange.glb', (gltf) => {
+    const model = gltf.scene;
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          child.material.side = THREE.DoubleSide;
+          child.material.color = new THREE.Color(0xffaa00);
+          child.material.map = null;
+          child.material.needsUpdate = true;
+        }
+      }
+    });
+    orangeWholeModel = model;
+    console.log('Orange whole model ready');
+  }, null, (err) => {
+    console.warn('Could not load fresh_orange.glb, using fallback:', err);
+  });
+
+  gltfLoader.load('3d_model/orange_half.glb', (gltf) => {
+    const model = gltf.scene;
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          // Replace material entirely with a fresh one to override all textures
+          child.material = new THREE.MeshStandardMaterial({
+            color: 0xffd700,
+            roughness: 0.5,
+            metalness: 0.0,
+            side: THREE.DoubleSide,
+          });
+        }
+      }
+    });
+    orangeHalfModel = model;
+    console.log('Orange half model ready');
+  }, null, (err) => {
+    console.warn('Could not load orange_half.glb, using fallback:', err);
+  });
+
+  gltfLoader.load('3d_model/watermelon.glb', (gltf) => {
+    const model = gltf.scene;
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) child.material.side = THREE.DoubleSide;
+      }
+    });
+    watermelonModel = model;
+    console.log('Watermelon model ready');
+  }, null, (err) => {
+    console.warn('Could not load watermelon.glb, using fallback:', err);
+  });
+
+  gltfLoader.load('3d_model/half_of_juicy_watermelon.glb', (gltf) => {
+    const model = gltf.scene;
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) child.material.side = THREE.DoubleSide;
+      }
+    });
+    watermelonHalfModel = model;
+    console.log('Watermelon half model ready');
+  }, null, (err) => {
+    console.warn('Could not load half_of_juicy_watermelon.glb, using fallback:', err);
+  });
+
+  gltfLoader.load('3d_model/dragon_fruit.glb', (gltf) => {
+    const model = gltf.scene;
+
+    // Debug: log what we got
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    console.log('Dragon fruit GLB loaded! Size:', size, 'Children:', model.children.length);
+
+    // Ensure all meshes have proper materials and shadows
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        // If material has no map and is black/default, make it visible
+        if (child.material) {
+          child.material.side = THREE.DoubleSide;
+          // Ensure material isn't fully transparent
+          if (child.material.transparent && child.material.opacity === 0) {
+            child.material.opacity = 1;
+          }
+        }
+      }
+    });
+
+    dragonFruitModel = model;
+    console.log('Dragon fruit model ready for use');
+  }, (progress) => {
+    console.log('Loading dragon_fruit.glb...', Math.round((progress.loaded / (progress.total || 1)) * 100) + '%');
+  }, (err) => {
+    console.warn('Could not load dragon_fruit.glb, using fallback geometry:', err);
+  });
+
+  // ---- Bomb Model Loaders ----
+  gltfLoader.load('3d_model/comical_bomb.glb', (gltf) => {
+    const model = gltf.scene;
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) child.material.side = THREE.DoubleSide;
+      }
+    });
+    comicalBombModel = model;
+    console.log('Comical bomb model ready');
+  }, null, (err) => {
+    console.warn('Could not load comical_bomb.glb:', err);
+  });
+
+  gltfLoader.load('3d_model/fat_man_bomb.glb', (gltf) => {
+    const model = gltf.scene;
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) child.material.side = THREE.DoubleSide;
+      }
+    });
+    fatManBombModel = model;
+    console.log('Fat man bomb model ready');
+  }, null, (err) => {
+    console.warn('Could not load fat_man_bomb.glb:', err);
+  });
+
+  // ---- Bomb Builder ----
+  function createBomb() {
+    const group = new THREE.Group();
+    const sourceModel = Math.random() < 0.5 ? comicalBombModel : fatManBombModel;
+
+    if (sourceModel) {
+      const model = sourceModel.clone(true);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) {
+        wrapper.scale.setScalar(1.4 / maxDim);
+      }
+      group.add(wrapper);
+    } else {
+      // Fallback — dark sphere with a fuse
+      const bodyGeo = new THREE.SphereGeometry(0.5, 20, 16);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6, metalness: 0.3 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.castShadow = true;
+      group.add(body);
+
+      const fuseGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.3, 6);
+      const fuseMat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.8 });
+      const fuse = new THREE.Mesh(fuseGeo, fuseMat);
+      fuse.position.y = 0.6;
+      fuse.rotation.z = 0.3;
+      group.add(fuse);
+
+      // Spark at tip
+      const sparkGeo = new THREE.SphereGeometry(0.06, 8, 8);
+      const sparkMat = new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff4400, emissiveIntensity: 2 });
+      const spark = new THREE.Mesh(sparkGeo, sparkMat);
+      spark.position.set(0.08, 0.75, 0);
+      group.add(spark);
+    }
+
+    group.userData.isBomb = true;
+    group.userData.fruitName = 'bomb';
+    group.userData.fruitRadius = 0.8;
+    group.scale.setScalar(2.5);
+    return group;
+  }
+
+  // ---- Explosion Effect ----
+  const explosionParts = [];
+
+  function spawnExplosion(position) {
+    // Screen flash
+    const flash = document.createElement('div');
+    flash.style.cssText = `
+      position:fixed;inset:0;z-index:100;pointer-events:none;
+      background:radial-gradient(circle at 50% 50%, rgba(255,200,50,0.9), rgba(255,80,0,0.6), transparent 70%);
+      animation: bombFlash 0.6s ease-out forwards;
+    `;
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 700);
+
+    // Add flash animation style if not present
+    if (!document.getElementById('bomb-flash-style')) {
+      const style = document.createElement('style');
+      style.id = 'bomb-flash-style';
+      style.textContent = `
+        @keyframes bombFlash {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.5); }
+        }
+        @keyframes bombShake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+          20%, 40%, 60%, 80% { transform: translateX(8px); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Screen shake
+    document.body.style.animation = 'bombShake 0.4s ease-out';
+    setTimeout(() => { document.body.style.animation = ''; }, 450);
+
+    // 3D explosion particles — fiery debris
+    const fireColors = [0xff4400, 0xff8800, 0xffcc00, 0xff2200, 0x222222];
+    for (let i = 0; i < 40; i++) {
+      const geo = new THREE.SphereGeometry(0.15 + Math.random() * 0.3, 6, 6);
+      const color = fireColors[Math.floor(Math.random() * fireColors.length)];
+      const mat = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: i < 20 ? 1.5 : 0,
+        roughness: 0.5,
+        transparent: true,
+        opacity: 1.0
+      });
+      const p = new THREE.Mesh(geo, mat);
+      p.position.copy(position);
+
+      const speed = 5 + Math.random() * 12;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI;
+      p.userData.vx = Math.sin(phi) * Math.cos(theta) * speed;
+      p.userData.vy = Math.sin(phi) * Math.sin(theta) * speed * 0.7 + 3;
+      p.userData.vz = Math.cos(phi) * speed * 0.5;
+      p.userData.life = 0.8 + Math.random() * 0.6;
+      p.userData.decay = 0.8 + Math.random() * 0.5;
+
+      scene.add(p);
+      explosionParts.push(p);
+    }
+
+    // Expanding fireball ring
+    const ringGeo = new THREE.RingGeometry(0.1, 0.5, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xff6600,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.copy(position);
+    ring.lookAt(camera.position);
+    ring.userData.vx = 0;
+    ring.userData.vy = 0;
+    ring.userData.vz = 0;
+    ring.userData.life = 0.5;
+    ring.userData.decay = 1.0;
+    ring.userData.isRing = true;
+    scene.add(ring);
+    explosionParts.push(ring);
+  }
+
+  function createDragonFruit() {
+    const group = new THREE.Group();
+
+    if (dragonFruitModel) {
+      // Clone the loaded GLTF model
+      const model = dragonFruitModel.clone(true);
+
+      // Deep clone materials so each fruit instance is independent
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      // Auto-center and auto-scale the model
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      // Create a wrapper to apply centering offset
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      // Scale so the longest dimension fits ~1.2 units
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) {
+        const desiredSize = 1.2;
+        wrapper.scale.setScalar(desiredSize / maxDim);
+      }
+
+      group.add(wrapper);
+    } else {
+      // Procedural dragon fruit — egg-shaped body with layered petal scales
+      // Body — elongated egg shape via lathe
+      const pts = [];
+      for (let i = 0; i <= 28; i++) {
+        const t = i / 28;
+        const angle = t * Math.PI;
+        // Egg shape: wider at bottom, tapered top
+        let r = Math.sin(angle) * 0.52;
+        if (t < 0.3) r *= 0.7 + t * 1.0; // narrow top
+        if (t > 0.85) r *= 1 - (t - 0.85) * 3; // taper bottom nub
+        pts.push(new THREE.Vector2(r, t * 1.4 - 0.7));
+      }
+      const bodyGeo = new THREE.LatheGeometry(pts, 28);
+
+      // Vertex colors — hot pink body with darker pink at poles, yellow-pink undertones
+      const posAttr = bodyGeo.attributes.position;
+      const colors = [];
+      for (let i = 0; i < posAttr.count; i++) {
+        const y = posAttr.getY(i);
+        const x = posAttr.getX(i);
+        const z = posAttr.getZ(i);
+        const normalizedY = (y + 0.7) / 1.4;
+
+        // Hot pink base
+        let cr = 0.87, cg = 0.12, cb = 0.35;
+
+        // Darker magenta near the top
+        if (normalizedY > 0.75) {
+          const blend = (normalizedY - 0.75) / 0.25;
+          cr -= blend * 0.15;
+          cg -= blend * 0.04;
+          cb += blend * 0.08;
+        }
+        // Yellowy-pink near the bottom tip
+        if (normalizedY < 0.15) {
+          const blend = (0.15 - normalizedY) / 0.15;
+          cr += blend * 0.1;
+          cg += blend * 0.12;
+          cb -= blend * 0.1;
+        }
+
+        // Scale-like pattern from angle
+        const angle = Math.atan2(z, x);
+        const scalePattern = Math.sin(angle * 6 + normalizedY * 8) * 0.06;
+        cr = Math.min(1, Math.max(0, cr + scalePattern));
+
+        colors.push(cr, cg, cb);
+      }
+      bodyGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+      const bodyMat = new THREE.MeshPhysicalMaterial({
+        vertexColors: true,
+        roughness: 0.35,
+        metalness: 0.0,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.2,
+      });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.castShadow = true;
+      group.add(body);
+
+      // Petal/scale leaves — layered rows curving outward like a real dragon fruit
+      const petalRows = [
+        { y: 0.45, count: 5, size: 0.28, tilt: 0.7, color: 0x44cc55 },  // top green
+        { y: 0.20, count: 6, size: 0.24, tilt: 0.5, color: 0xdd2870 },  // upper pink
+        { y: -0.05, count: 7, size: 0.22, tilt: 0.35, color: 0xee3388 }, // mid pink
+        { y: -0.25, count: 6, size: 0.18, tilt: 0.25, color: 0xcc2266 }, // lower pink
+      ];
+
+      for (const row of petalRows) {
+        for (let i = 0; i < row.count; i++) {
+          const theta = (i / row.count) * Math.PI * 2 + row.y; // offset per row
+
+          // Petal shape
+          const petalShape = new THREE.Shape();
+          petalShape.moveTo(0, 0);
+          petalShape.bezierCurveTo(-0.06, row.size * 0.4, -0.04, row.size * 0.8, 0, row.size);
+          petalShape.bezierCurveTo(0.04, row.size * 0.8, 0.06, row.size * 0.4, 0, 0);
+          const petalGeo = new THREE.ShapeGeometry(petalShape);
+          const petalMat = new THREE.MeshStandardMaterial({
+            color: row.color,
+            roughness: 0.4,
+            side: THREE.DoubleSide,
+          });
+          const petal = new THREE.Mesh(petalGeo, petalMat);
+
+          // Get body radius at this Y
+          const bodyT = (row.y + 0.7) / 1.4;
+          const bodyAngle = bodyT * Math.PI;
+          let bodyR = Math.sin(bodyAngle) * 0.52;
+          if (bodyT < 0.3) bodyR *= 0.7 + bodyT * 1.0;
+
+          petal.position.set(
+            Math.cos(theta) * bodyR,
+            row.y,
+            Math.sin(theta) * bodyR
+          );
+
+          // Face outward and tilt backward
+          petal.lookAt(
+            Math.cos(theta) * (bodyR + 1),
+            row.y + row.tilt,
+            Math.sin(theta) * (bodyR + 1)
+          );
+
+          petal.castShadow = true;
+          group.add(petal);
+        }
+      }
+
+      // Tiny green tip at the very top
+      const tipGeo = new THREE.ConeGeometry(0.06, 0.12, 6);
+      const tipMat = new THREE.MeshStandardMaterial({ color: 0x55cc55, roughness: 0.5 });
+      const tip = new THREE.Mesh(tipGeo, tipMat);
+      tip.position.y = 0.68;
+      group.add(tip);
+    }
+
+    group.userData.juiceColor = 0xff66aa;
+    group.userData.fruitColor = 0xdd2266;
+    group.userData.fleshColor = 0xffffff;
+    group.userData.skinColor = 0xdd2266;
+    group.userData.seedColor = 0x222222;
+    group.userData.fruitRadius = 0.8;
+    group.userData.fruitName = 'dragonfruit';
+    group.scale.setScalar(2.8);
+    return group;
+  }
+
+  const fruitBuilders = {
+    apple: createApple,
+    orange: createOrange,
+    banana: createBanana,
+    watermelon: createWatermelon,
+    dragonfruit: createDragonFruit,
+  };
+
+  const fruitScores = { apple: 10, orange: 10, banana: 15, watermelon: 20, dragonfruit: 25 };
+
+  // ---- Active Fruit List ----
+  const fruits = [];
+  const slicedParts = [];
+  const juiceParticles = [];
+
+  // ---- Juice Particle System ----
+  const particleGeo = new THREE.SphereGeometry(0.18, 6, 6);
+
+  function spawnJuice(position, color, count) {
+    for (let i = 0; i < count; i++) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: color,
+        roughness: 0.3,
+        transparent: true,
+        opacity: 0.9
+      });
+      const p = new THREE.Mesh(particleGeo, mat);
+      p.position.copy(position);
+      p.scale.setScalar(0.5 + Math.random() * 1.0);
+      const speed = 3 + Math.random() * 5;
+      const angle = Math.random() * Math.PI * 2;
+      const upAngle = Math.random() * Math.PI * 0.6 + 0.2;
+      p.userData.vx = Math.cos(angle) * Math.sin(upAngle) * speed;
+      p.userData.vy = Math.cos(upAngle) * speed * 0.5 + Math.random() * 3;
+      p.userData.vz = Math.sin(angle) * Math.sin(upAngle) * speed;
+      p.userData.life = 1.0;
+      p.userData.decay = 0.6 + Math.random() * 0.8;
+      scene.add(p);
+      juiceParticles.push(p);
+    }
+  }
+
+  // ---- Hemisphere geometry (actual half-sphere) ----
+  function makeHemisphereGeo(radius, side) {
+    // side: 1 = top half (phi 0 to PI/2), -1 = bottom half (phi PI/2 to PI)
+    const phiStart = side > 0 ? 0 : Math.PI * 0.5;
+    const phiLength = Math.PI * 0.5;
+    return new THREE.SphereGeometry(radius, 24, 12, 0, Math.PI * 2, phiStart, phiLength);
+  }
+
+  // ---- Cross section disc (inner flesh) ----
+  function createCrossSection(fruitData) {
+    const radius = fruitData.fruitRadius || 0.6;
+    const fleshColor = fruitData.fleshColor || 0xffeedd;
+    const skinColor = fruitData.skinColor || 0xcc4444;
+    const seedColor = fruitData.seedColor;
+    const fruitName = fruitData.fruitName;
+
+    const group = new THREE.Group();
+
+    // Outer skin ring
+    const ringGeo = new THREE.RingGeometry(radius * 0.88, radius * 1.01, 32);
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: skinColor, roughness: 0.5, side: THREE.DoubleSide
+    });
+    group.add(new THREE.Mesh(ringGeo, ringMat));
+
+    // Inner flesh disc
+    const fleshGeo = new THREE.CircleGeometry(radius * 0.89, 32);
+    const fleshMat = new THREE.MeshStandardMaterial({
+      color: fleshColor, roughness: 0.55, side: THREE.DoubleSide
+    });
+    const flesh = new THREE.Mesh(fleshGeo, fleshMat);
+    flesh.position.z = 0.002;
+    group.add(flesh);
+
+    // Fruit-specific interior details
+    if (fruitName === 'watermelon' && seedColor) {
+      const seedGeo = new THREE.CircleGeometry(0.04, 5);
+      const seedMat = new THREE.MeshStandardMaterial({ color: seedColor, side: THREE.DoubleSide });
+      for (let i = 0; i < 14; i++) {
+        const seed = new THREE.Mesh(seedGeo, seedMat);
+        const a = Math.random() * Math.PI * 2;
+        const d = Math.random() * radius * 0.6;
+        seed.position.set(Math.cos(a) * d, Math.sin(a) * d, 0.004);
+        group.add(seed);
+      }
+    } else if (fruitName === 'apple' && seedColor) {
+      const coreGeo = new THREE.CircleGeometry(radius * 0.15, 16);
+      const coreMat = new THREE.MeshStandardMaterial({ color: 0xeedd99, roughness: 0.7, side: THREE.DoubleSide });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      core.position.z = 0.004;
+      group.add(core);
+      const seedGeo = new THREE.CircleGeometry(0.035, 5);
+      const seedMat = new THREE.MeshStandardMaterial({ color: seedColor, side: THREE.DoubleSide });
+      for (let i = 0; i < 5; i++) {
+        const seed = new THREE.Mesh(seedGeo, seedMat);
+        const a = (i / 5) * Math.PI * 2 + 0.3;
+        seed.position.set(Math.cos(a) * radius * 0.18, Math.sin(a) * radius * 0.18, 0.006);
+        group.add(seed);
+      }
+    } else if (fruitName === 'orange') {
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const segGeo = new THREE.CircleGeometry(radius * 0.35, 3);
+        const segMat = new THREE.MeshStandardMaterial({ color: 0xffcc80, roughness: 0.5, side: THREE.DoubleSide });
+        const seg = new THREE.Mesh(segGeo, segMat);
+        seg.position.set(Math.cos(a) * radius * 0.35, Math.sin(a) * radius * 0.35, 0.004);
+        seg.rotation.z = a + Math.PI / 2;
+        seg.scale.set(0.65, 0.95, 1);
+        group.add(seg);
+      }
+      const pithGeo = new THREE.CircleGeometry(radius * 0.12, 12);
+      const pithMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, side: THREE.DoubleSide });
+      const pith = new THREE.Mesh(pithGeo, pithMat);
+      pith.position.z = 0.005;
+      group.add(pith);
+    } else if (fruitName === 'dragonfruit' && seedColor) {
+      // White flesh with scattered black seeds (like real dragon fruit inside)
+      const seedGeo = new THREE.CircleGeometry(0.025, 4);
+      const seedMat = new THREE.MeshStandardMaterial({ color: seedColor, side: THREE.DoubleSide });
+      for (let i = 0; i < 30; i++) {
+        const seed = new THREE.Mesh(seedGeo, seedMat);
+        const a = Math.random() * Math.PI * 2;
+        const d = Math.random() * radius * 0.7;
+        seed.position.set(Math.cos(a) * d, Math.sin(a) * d, 0.004);
+        group.add(seed);
+      }
+    }
+
+    return group;
+  }
+
+  // ---- Sliced Banana Half (curved tube cut lengthwise) ----
+  function createBananaHalf(fruitGroup, sliceDir) {
+    const data = fruitGroup.userData;
+    const half = new THREE.Group();
+    half.position.copy(fruitGroup.position);
+    half.rotation.copy(fruitGroup.rotation);
+    half.scale.copy(fruitGroup.scale).multiplyScalar(0.85);
+
+    // Recreate the banana curve
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.5, -0.3, 0),
+      new THREE.Vector3(-0.2, 0.1, 0.05),
+      new THREE.Vector3(0.15, 0.35, 0.05),
+      new THREE.Vector3(0.5, 0.5, 0)
+    ]);
+
+    // Build a proper half-tube with matching segments
+    const tubeSeg = 28;
+    const radSeg = 14;
+    const tubeGeo = new THREE.TubeGeometry(curve, tubeSeg, 0.18, radSeg, false);
+    const pos = tubeGeo.attributes.position;
+
+    // Collapse vertices on the hidden half to the curve center
+    for (let i = 0; i <= tubeSeg; i++) {
+      for (let j = 0; j <= radSeg; j++) {
+        const idx = i * (radSeg + 1) + j;
+        const angle = (j / radSeg) * Math.PI * 2;
+        if (sliceDir > 0 && angle > Math.PI && angle < Math.PI * 2) {
+          const t = i / tubeSeg;
+          const pt = curve.getPoint(t);
+          pos.setXYZ(idx, pt.x, pt.y, pt.z);
+        } else if (sliceDir < 0 && angle >= 0 && angle < Math.PI) {
+          const t = i / tubeSeg;
+          const pt = curve.getPoint(t);
+          pos.setXYZ(idx, pt.x, pt.y, pt.z);
+        }
+      }
+    }
+    tubeGeo.computeVertexNormals();
+
+    // Vertex colors matching the whole banana — yellow with green tips
+    const colors = [];
+    for (let i = 0; i < pos.count; i++) {
+      const segIndex = Math.floor(i / (radSeg + 1));
+      const t = segIndex / tubeSeg;
+      let r = 1.0, g = 0.87, b = 0.0;
+      if (t < 0.12) {
+        const blend = (0.12 - t) / 0.12;
+        r -= blend * 0.35; g += blend * 0.05; b += blend * 0.02;
+      }
+      if (t > 0.88) {
+        const blend = (t - 0.88) / 0.12;
+        r -= blend * 0.25; g -= blend * 0.1; b += blend * 0.02;
+      }
+      colors.push(r, g, b);
+    }
+    tubeGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const skinMat = new THREE.MeshPhysicalMaterial({
+      vertexColors: true,
+      roughness: 0.35,
+      metalness: 0.0,
+      clearcoat: 0.3,
+      clearcoatRoughness: 0.3,
+      side: THREE.DoubleSide
+    });
+    const tubeMesh = new THREE.Mesh(tubeGeo, skinMat);
+    tubeMesh.castShadow = true;
+    half.add(tubeMesh);
+
+    // Flat flesh face — thicker visible cross-section along the cut
+    const steps = 40;
+    const curvePts = curve.getPoints(steps);
+    const fleshShape = new THREE.Shape();
+    const thickness = 0.16; // visible flesh width
+    // Top edge
+    fleshShape.moveTo(curvePts[0].x, curvePts[0].y);
+    for (let i = 1; i < curvePts.length; i++) {
+      fleshShape.lineTo(curvePts[i].x, curvePts[i].y);
+    }
+    // Bottom edge (offset for thickness)
+    for (let i = curvePts.length - 1; i >= 0; i--) {
+      const tangent = curve.getTangentAt(i / steps);
+      const nx = -tangent.y, ny = tangent.x; // perpendicular
+      const len = Math.sqrt(nx * nx + ny * ny) || 1;
+      fleshShape.lineTo(
+        curvePts[i].x + (nx / len) * thickness,
+        curvePts[i].y + (ny / len) * thickness
+      );
+    }
+    const fleshGeo = new THREE.ShapeGeometry(fleshShape);
+    const fleshMat = new THREE.MeshStandardMaterial({
+      color: 0xfff3c4, roughness: 0.5, side: THREE.DoubleSide
+    });
+    const fleshMesh = new THREE.Mesh(fleshGeo, fleshMat);
+    fleshMesh.position.z = sliceDir * 0.005;
+    half.add(fleshMesh);
+
+    // Cap ends — brown tips
+    const capGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x8a7a30, roughness: 0.6 });
+    const cap1 = new THREE.Mesh(capGeo, capMat);
+    cap1.position.copy(curve.getPoint(0));
+    half.add(cap1);
+    const capMat2 = new THREE.MeshStandardMaterial({ color: 0x5a4a1a, roughness: 0.7 });
+    const cap2 = new THREE.Mesh(capGeo, capMat2);
+    cap2.position.copy(curve.getPoint(1));
+    cap2.scale.setScalar(0.7);
+    half.add(cap2);
+
+    // Physics
+    half.userData.vx = data.vx * 0.3 + sliceDir * (2 + Math.random() * 2);
+    half.userData.vy = data.vy * 0.4 + 1.5 + Math.random() * 3;
+    half.userData.vz = sliceDir * (1 + Math.random());
+    half.userData.rotSpeedX = (Math.random() - 0.5) * 5;
+    half.userData.rotSpeedY = (Math.random() - 0.5) * 3;
+    half.userData.rotSpeedZ = (Math.random() - 0.5) * 5;
+    half.userData.life = 2.0;
+    half.userData.sliced = false;
+    half.userData.fruitName = 'banana';
+
+    scene.add(half);
+    slicedParts.push(half);
+  }
+
+  // ---- Sliced Orange Half (use orange GLB half model) ----
+  function createOrangeHalf(fruitGroup, sliceDir) {
+    const data = fruitGroup.userData;
+    const half = new THREE.Group();
+    half.position.copy(fruitGroup.position);
+    half.rotation.copy(fruitGroup.rotation);
+    half.scale.copy(fruitGroup.scale).multiplyScalar(0.85);
+
+    if (orangeHalfModel) {
+      const model = orangeHalfModel.clone(true);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) {
+        wrapper.scale.setScalar(1.2 / maxDim);
+      }
+
+      if (sliceDir < 0) {
+        wrapper.scale.x *= -1;
+      }
+
+      half.add(wrapper);
+    } else {
+      // Fallback — hemisphere + cross-section
+      const radius = data.fruitRadius || 0.88;
+      const hemiGeo = makeHemisphereGeo(radius, sliceDir);
+      const hemiMat = new THREE.MeshStandardMaterial({
+        color: data.skinColor || 0xff8c00, roughness: 0.4, side: THREE.DoubleSide
+      });
+      const hemiMesh = new THREE.Mesh(hemiGeo, hemiMat);
+      hemiMesh.rotation.z = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(hemiMesh);
+
+      const cross = createCrossSection(data);
+      cross.rotation.y = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(cross);
+    }
+
+    half.userData.vx = data.vx * 0.3 + sliceDir * (2.5 + Math.random() * 2);
+    half.userData.vy = data.vy * 0.4 + 1.5 + Math.random() * 3;
+    half.userData.vz = (Math.random() - 0.5) * 2;
+    half.userData.rotSpeedX = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedY = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedZ = (Math.random() - 0.5) * 4;
+    half.userData.life = 2.0;
+    half.userData.fruitName = 'orange';
+    half.userData.fruitRadius = data.fruitRadius;
+    half.userData.skinColor = data.skinColor;
+    half.userData.fleshColor = data.fleshColor;
+    half.userData.seedColor = data.seedColor;
+    half.userData.juiceColor = data.juiceColor;
+    half.userData.fruitColor = data.fruitColor;
+    half.userData.cutLevel = (data.cutLevel || 0) + 1;
+    half.userData.sliced = false;
+
+    scene.add(half);
+    slicedParts.push(half);
+  }
+
+  // ---- Sliced Watermelon Half (use half_of_juicy_watermelon.glb) ----
+  function createWatermelonHalf(fruitGroup, sliceDir) {
+    const data = fruitGroup.userData;
+    const half = new THREE.Group();
+    half.position.copy(fruitGroup.position);
+    half.rotation.copy(fruitGroup.rotation);
+    half.scale.copy(fruitGroup.scale).multiplyScalar(0.85);
+
+    if (watermelonHalfModel) {
+      const model = watermelonHalfModel.clone(true);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      // Auto-center and auto-scale to match the whole fruit size
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) {
+        wrapper.scale.setScalar(1.2 / maxDim);
+      }
+
+      // Mirror one half so they fly apart in opposite directions
+      if (sliceDir < 0) {
+        wrapper.scale.x *= -1;
+      }
+
+      half.add(wrapper);
+    } else {
+      // Fallback — hemisphere + cross-section
+      const radius = data.fruitRadius || 1.0;
+      const hemiGeo = makeHemisphereGeo(radius, sliceDir);
+      const hemiMat = new THREE.MeshStandardMaterial({
+        color: data.skinColor || 0x2d7a2d, roughness: 0.4, side: THREE.DoubleSide
+      });
+      const hemiMesh = new THREE.Mesh(hemiGeo, hemiMat);
+      hemiMesh.rotation.z = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(hemiMesh);
+
+      const cross = createCrossSection(data);
+      cross.rotation.y = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(cross);
+    }
+
+    // Physics
+    half.userData.vx = data.vx * 0.3 + sliceDir * (2.5 + Math.random() * 2);
+    half.userData.vy = data.vy * 0.4 + 1.5 + Math.random() * 3;
+    half.userData.vz = (Math.random() - 0.5) * 2;
+    half.userData.rotSpeedX = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedY = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedZ = (Math.random() - 0.5) * 4;
+    half.userData.life = 2.0;
+    half.userData.fruitName = 'watermelon';
+    half.userData.fruitRadius = data.fruitRadius;
+    half.userData.skinColor = data.skinColor;
+    half.userData.fleshColor = data.fleshColor;
+    half.userData.seedColor = data.seedColor;
+    half.userData.juiceColor = data.juiceColor;
+    half.userData.fruitColor = data.fruitColor;
+    half.userData.cutLevel = (data.cutLevel || 0) + 1;
+    half.userData.sliced = false;
+
+    scene.add(half);
+    slicedParts.push(half);
+  }
+
+  // ---- Sliced Dragon Fruit Half (clip the actual model) ----
+  function createDragonFruitHalf(fruitGroup, sliceDir) {
+    const data = fruitGroup.userData;
+
+    // Clone the entire fruit group — preserves exact hierarchy and look
+    const half = fruitGroup.clone(true);
+    half.position.copy(fruitGroup.position);
+    half.rotation.copy(fruitGroup.rotation);
+    half.scale.copy(fruitGroup.scale).multiplyScalar(0.85);
+
+    // Clipping plane in WORLD space — must be at the fruit's actual position
+    const worldPos = new THREE.Vector3();
+    fruitGroup.getWorldPosition(worldPos);
+    const clipPlane = new THREE.Plane(
+      new THREE.Vector3(sliceDir, 0, 0),
+      -sliceDir * worldPos.x
+    );
+
+    // Apply clipping to every mesh inside the cloned group
+    half.traverse(child => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+        child.material.clippingPlanes = [clipPlane];
+        child.material.clipShadows = true;
+        child.material.side = THREE.DoubleSide;
+      }
+    });
+
+    // Cross-section disc on the cut face — white flesh with black seeds
+    const radius = data.fruitRadius || 0.8;
+    const cross = createCrossSection(data);
+    cross.rotation.y = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+    half.add(cross);
+
+    // Clear old userData and set physics
+    half.userData = {};
+    half.userData.vx = data.vx * 0.3 + sliceDir * (2.5 + Math.random() * 2);
+    half.userData.vy = data.vy * 0.4 + 1.5 + Math.random() * 3;
+    half.userData.vz = (Math.random() - 0.5) * 2;
+    half.userData.rotSpeedX = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedY = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedZ = (Math.random() - 0.5) * 4;
+    half.userData.life = 2.0;
+    half.userData.fruitName = 'dragonfruit';
+    half.userData.fruitRadius = radius;
+    half.userData.skinColor = data.skinColor;
+    half.userData.fleshColor = data.fleshColor;
+    half.userData.seedColor = data.seedColor;
+    half.userData.juiceColor = data.juiceColor;
+    half.userData.fruitColor = data.fruitColor;
+    half.userData.cutLevel = (data.cutLevel || 0) + 1;
+    half.userData.sliced = false;
+
+    scene.add(half);
+    slicedParts.push(half);
+  }
+
+  // ---- Sliced Fruit Halves ----
+  function createHalf(fruitGroup, sliceDir, swipeDX, swipeDY) {
+    // Banana gets special slicing
+    if (fruitGroup.userData.fruitName === 'banana') {
+      createBananaHalf(fruitGroup, sliceDir);
+      return;
+    }
+
+    // Dragon fruit — clip the actual model in half
+    if (fruitGroup.userData.fruitName === 'dragonfruit') {
+      createDragonFruitHalf(fruitGroup, sliceDir);
+      return;
+    }
+
+    // Watermelon — use the half GLB model
+    if (fruitGroup.userData.fruitName === 'watermelon') {
+      createWatermelonHalf(fruitGroup, sliceDir);
+      return;
+    }
+
+    // Orange — use the half GLB model
+    if (fruitGroup.userData.fruitName === 'orange') {
+      createOrangeHalf(fruitGroup, sliceDir);
+      return;
+    }
+
+    const data = fruitGroup.userData;
+    const radius = data.fruitRadius || 0.65;
+    const skinColor = data.skinColor || 0xcc4444;
+
+    const half = new THREE.Group();
+    half.position.copy(fruitGroup.position);
+    half.rotation.copy(fruitGroup.rotation);
+    half.scale.copy(fruitGroup.scale).multiplyScalar(0.85);
+
+    // Build a true hemisphere shell (the outer skin half)
+    const hemiGeo = makeHemisphereGeo(radius, sliceDir);
+    const hemiMat = new THREE.MeshStandardMaterial({
+      color: skinColor,
+      roughness: 0.4,
+      metalness: 0.05,
+      side: THREE.DoubleSide
+    });
+    const hemiMesh = new THREE.Mesh(hemiGeo, hemiMat);
+    hemiMesh.castShadow = true;
+    // Rotate so the flat cut faces sideways (X axis) instead of up/down
+    hemiMesh.rotation.z = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+    half.add(hemiMesh);
+
+    // Add the cross-section disc (flesh face) on the flat side
+    const cross = createCrossSection(data);
+    // Rotate disc to face the cut direction
+    cross.rotation.y = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+    half.add(cross);
+
+    // Physics — halves fly apart
+    half.userData.vx = data.vx * 0.3 + sliceDir * (2.5 + Math.random() * 2);
+    half.userData.vy = data.vy * 0.4 + 1.5 + Math.random() * 3;
+    half.userData.vz = (Math.random() - 0.5) * 2;
+    half.userData.rotSpeedX = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedY = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedZ = (Math.random() - 0.5) * 4;
+    half.userData.life = 2.0;
+
+    // Track fruit data for re-slicing (keep same radius — geometry is already half)
+    half.userData.fruitName = data.fruitName;
+    half.userData.fruitRadius = data.fruitRadius || 0.65;
+    half.userData.skinColor = data.skinColor;
+    half.userData.fleshColor = data.fleshColor;
+    half.userData.seedColor = data.seedColor;
+    half.userData.juiceColor = data.juiceColor;
+    half.userData.fruitColor = data.fruitColor;
+    half.userData.cutLevel = (data.cutLevel || 0) + 1;
+    half.userData.sliced = false;
+
+    scene.add(half);
+    slicedParts.push(half);
+  }
+
+  // ---- Spawn Fruit ----
+  const MIN_SPAWN_DIST = 2.5; // minimum X distance between active fruits near spawn
+  const BOMB_CHANCE = 0.15; // 15% chance to spawn a bomb instead of fruit
+
+  function spawnFruit() {
+    const isBomb = Math.random() < BOMB_CHANCE;
+    let fruit;
+
+    if (isBomb) {
+      fruit = createBomb();
+    } else {
+      const type = FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)];
+      fruit = fruitBuilders[type]();
+    }
+
+    // Launch from bottom, random X — avoid overlapping other recent fruits
+    const spread = 8;
+    let startX;
+    let attempts = 0;
+    do {
+      startX = (Math.random() - 0.5) * spread;
+      attempts++;
+    } while (attempts < 10 && fruits.some(f => {
+      // Only check fruits still near the bottom (recently spawned)
+      if (f.position.y > 2) return false;
+      return Math.abs(f.position.x - startX) < MIN_SPAWN_DIST;
+    }));
+
+    fruit.position.set(startX, -2, 0);
+
+    // Velocity — arc upward, spread apart based on position
+    const vx = (Math.random() - 0.5) * 3 - startX * 0.3;
+    const vy = 9 + Math.random() * 4;
+    const vz = (Math.random() - 0.5) * 2;
+
+    fruit.userData.vx = vx;
+    fruit.userData.vy = vy;
+    fruit.userData.vz = vz;
+    fruit.userData.rotSpeedX = (Math.random() - 0.5) * 4;
+    fruit.userData.rotSpeedY = (Math.random() - 0.5) * 4;
+    fruit.userData.rotSpeedZ = (Math.random() - 0.5) * 4;
+    fruit.userData.sliced = false;
+    fruit.userData.missed = false;
+    fruit.userData.scored = false;
+
+    scene.add(fruit);
+    fruits.push(fruit);
+  }
+
+  // ---- Blade Trail ----
+  const trail = [];
+  const TRAIL_LENGTH = 12;
+
+  function resizeTrailCanvas() {
+    trailCanvas.width = window.innerWidth * (window.devicePixelRatio || 1);
+    trailCanvas.height = window.innerHeight * (window.devicePixelRatio || 1);
+    trailCanvas.style.width = window.innerWidth + 'px';
+    trailCanvas.style.height = window.innerHeight + 'px';
+    trailCtx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+  }
+
+  function drawTrail() {
+    trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+    if (trail.length < 2) return;
+
+    const now = performance.now();
+    trailCtx.lineCap = 'round';
+    trailCtx.lineJoin = 'round';
+
+    for (let i = 1; i < trail.length; i++) {
+      const age = (now - trail[i].time) / 150;
+      if (age > 1) continue;
+      const alpha = (1 - age) * 0.8;
+      const width = (1 - age) * 6 + 1;
+      trailCtx.strokeStyle = `rgba(200,230,255,${alpha.toFixed(2)})`;
+      trailCtx.lineWidth = width;
+      trailCtx.beginPath();
+      trailCtx.moveTo(trail[i - 1].x, trail[i - 1].y);
+      trailCtx.lineTo(trail[i].x, trail[i].y);
+      trailCtx.stroke();
+    }
+
+    // Glow layer
+    for (let i = 1; i < trail.length; i++) {
+      const age = (now - trail[i].time) / 150;
+      if (age > 1) continue;
+      const alpha = (1 - age) * 0.3;
+      const width = (1 - age) * 16 + 4;
+      trailCtx.strokeStyle = `rgba(150,200,255,${alpha.toFixed(2)})`;
+      trailCtx.lineWidth = width;
+      trailCtx.beginPath();
+      trailCtx.moveTo(trail[i - 1].x, trail[i - 1].y);
+      trailCtx.lineTo(trail[i].x, trail[i].y);
+      trailCtx.stroke();
+    }
+  }
+
+  // ---- Pointer / Swipe ----
+  let pointerDown = false;
+  let pointerX = 0;
+  let pointerY = 0;
+  let lastPointerX = 0;
+  let lastPointerY = 0;
+  const raycaster = new THREE.Raycaster();
+  const pointerNDC = new THREE.Vector2();
+
+  function onPointerDown(e) {
+    if (!gameRunning) return;
+    if (window.__squidlyMockGazeOnly && window.__squidlyMockGazeOnly()) return;
+    const x = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
+    const y = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
+    pointerDown = true;
+    pointerX = x;
+    pointerY = y;
+    lastPointerX = x;
+    lastPointerY = y;
+    trail.length = 0;
+    trail.push({ x, y, time: performance.now() });
+  }
+
+  function onPointerMove(e) {
+    if (!pointerDown || !gameRunning) return;
+    if (window.__squidlyMockGazeOnly && window.__squidlyMockGazeOnly()) return;
+    const x = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
+    const y = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
+    lastPointerX = pointerX;
+    lastPointerY = pointerY;
+    pointerX = x;
+    pointerY = y;
+
+    trail.push({ x, y, time: performance.now() });
+    while (trail.length > TRAIL_LENGTH) trail.shift();
+
+    // Check swipe speed
+    const dx = pointerX - lastPointerX;
+    const dy = pointerY - lastPointerY;
+    const speed = Math.sqrt(dx * dx + dy * dy);
+    if (speed < 3) return;
+
+    // Raycast for fruit hits
+    pointerNDC.x = (x / window.innerWidth) * 2 - 1;
+    pointerNDC.y = -(y / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointerNDC, camera);
+
+    let hitThisFrame = false;
+    for (let i = fruits.length - 1; i >= 0; i--) {
+      const fruit = fruits[i];
+      if (fruit.userData.sliced) continue;
+
+      // Use bounding sphere check
+      const fruitPos = fruit.position.clone();
+      const ray = raycaster.ray;
+      const dist = ray.distanceToPoint(fruitPos);
+
+      if (dist < 1.8) {
+        // BOMB CHECK
+        if (fruit.userData.isBomb) {
+          fruit.userData.sliced = true;
+          spawnExplosion(fruit.position.clone());
+          scene.remove(fruit);
+          fruits.splice(i, 1);
+          endGame(true);
+          return;
+        }
+
+        // SLICED!
+        fruit.userData.sliced = true;
+        const name = fruit.userData.fruitName;
+        const pts = fruitScores[name] || 10;
+        score += pts;
+        hitThisFrame = true;
+
+        // Combo
+        comboCount++;
+        comboTimer = 0.5;
+
+        if (comboCount >= 3) {
+          const comboBonus = comboCount * 5;
+          score += comboBonus;
+          comboLabel.textContent = `🔥 ${comboCount}x COMBO! +${comboBonus}`;
+          comboLabel.style.opacity = '1';
+        }
+
+        updateScore();
+
+        // Spawn halves
+        const sliceDir = dx > 0 ? 1 : -1;
+        createHalf(fruit, sliceDir, dx, dy);
+        createHalf(fruit, -sliceDir, dx, dy);
+
+        // Juice particles
+        spawnJuice(fruit.position, fruit.userData.juiceColor, 20);
+        spawnJuice(fruit.position, fruit.userData.fruitColor, 10);
+
+        // Remove original
+        scene.remove(fruit);
+        fruits.splice(i, 1);
+      }
+    }
+
+    if (!hitThisFrame) {
+      // Reset combo on miss-swing
+      // (only reset if enough time passes without hitting — handled in update)
+    }
+  }
+
+  function onPointerUp() {
+    pointerDown = false;
+  }
+
+  window.addEventListener('mousedown', onPointerDown);
+  window.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('mouseup', onPointerUp);
+  window.addEventListener('touchstart', e => { e.preventDefault(); onPointerDown(e.touches[0]); }, { passive: false });
+  window.addEventListener('touchmove', e => { e.preventDefault(); onPointerMove(e.touches[0]); }, { passive: false });
+  window.addEventListener('touchend', onPointerUp);
+
+  // ---- Keyboard: S key toggles slow-mo ----
+  window.addEventListener('keydown', e => {
+    if (e.key === 's' || e.key === 'S') {
+      if (!gameRunning) return;
+      if (slowmoRemaining > 0) {
+        slowmoRemaining = 0;
+      } else {
+        slowmoRemaining = SLOWMO_DURATION;
+      }
+    }
+  });
+
+  // ---- Slow-Mo HUD ----
+  const slowmoNode = document.getElementById('slowmo');
+  const slowmoBarNode = document.getElementById('slowmo-bar');
+
+  function renderSlowmoStatus(pct) {
+    slowmoNode.style.opacity = pct === 0 ? 0 : 1;
+    slowmoBarNode.style.transform = `scaleX(${pct.toFixed(3)})`;
+  }
+
+  // ---- Score / HUD ----
+  function updateScore() {
+    scoreLabel.textContent = 'Score: ' + score;
+
+    // Milestone check — activate slow-mo every SCORE_MILESTONE points (if off cooldown)
+    const currentMilestone = Math.floor(score / SCORE_MILESTONE) * SCORE_MILESTONE;
+    if (currentMilestone > lastMilestone && currentMilestone > 0) {
+      lastMilestone = currentMilestone;
+      if (slowmoCooldown <= 0 && slowmoRemaining <= 0) {
+        slowmoRemaining = SLOWMO_DURATION;
+        slowmoCooldown = SLOWMO_COOLDOWN;
+      }
+    }
+  }
+
+  function updateMisses() {
+    const xs = '❌'.repeat(misses) + '⭕'.repeat(MAX_MISSES - misses);
+    missLabel.textContent = xs;
+  }
+
+  // ---- Game Flow ----
+  function startGame() {
+    score = 0;
+    misses = 0;
+    comboCount = 0;
+    comboTimer = 0;
+    spawnTimer = 0;
+    nextSpawnDelay = 1200;
+    slowmoRemaining = 0;
+    slowmoCooldown = 0;
+    gameSpeed = 1;
+    lastMilestone = 0;
+    gameRunning = true;
+
+    // Clear scene of fruits
+    fruits.forEach(f => scene.remove(f));
+    fruits.length = 0;
+    slicedParts.forEach(f => scene.remove(f));
+    slicedParts.length = 0;
+    juiceParticles.forEach(p => scene.remove(p));
+    juiceParticles.length = 0;
+    explosionParts.forEach(p => scene.remove(p));
+    explosionParts.length = 0;
+
+    updateScore();
+    updateMisses();
+
+    menuMain.classList.add('hidden');
+    menuGameover.classList.add('hidden');
+
+    // Reset gaze tracking
+    gazePrevX = null;
+    gazePrevY = null;
+
+    clock = new THREE.Clock();
+    clock.start();
+  }
+
+  function endGame(bombDeath) {
+    gameRunning = false;
+    saveHighScore();
+    const hsText = highScore > 0 ? ` | Best: ${highScore}` : '';
+    finalScoreEl.textContent = 'Score: ' + score + hsText;
+    const goTitle = menuGameover.querySelector('h1');
+    goTitle.textContent = bombDeath ? '💣 BOOM!' : 'Game Over';
+    menuGameover.classList.remove('hidden');
+  }
+
+  // ---- Button Handlers ----
+  const btnPlay = document.getElementById('btn-play');
+  const btnRestart = document.getElementById('btn-restart');
+  const btnMenu = document.getElementById('btn-menu');
+
+  btnPlay.addEventListener('click', startGame);
+  btnRestart.addEventListener('click', startGame);
+
+  // Squidly access-button events (fired by dwell/switch instead of click)
+  if (btnPlay.parentElement && btnPlay.parentElement.tagName === 'ACCESS-BUTTON') {
+    btnPlay.parentElement.addEventListener('access-click', startGame);
+  }
+  if (btnRestart.parentElement && btnRestart.parentElement.tagName === 'ACCESS-BUTTON') {
+    btnRestart.parentElement.addEventListener('access-click', startGame);
+  }
+
+  const menuHandler = () => {
+    menuGameover.classList.add('hidden');
+    menuMain.classList.remove('hidden');
+    // Clear scene
+    fruits.forEach(f => scene.remove(f));
+    fruits.length = 0;
+    slicedParts.forEach(f => scene.remove(f));
+    slicedParts.length = 0;
+    juiceParticles.forEach(p => scene.remove(p));
+    juiceParticles.length = 0;
+  };
+  btnMenu.addEventListener('click', menuHandler);
+  if (btnMenu.parentElement && btnMenu.parentElement.tagName === 'ACCESS-BUTTON') {
+    btnMenu.parentElement.addEventListener('access-click', menuHandler);
+  }
+
+  // ---- Resize ----
+  function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    resizeTrailCanvas();
+  }
+  window.addEventListener('resize', onResize);
+  resizeTrailCanvas();
+
+  // ---- Enable clipping ----
+  renderer.localClippingEnabled = true;
+
+  // ---- Main Loop ----
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const rawDt = clock ? Math.min(clock.getDelta(), 0.05) : 0.016;
+    const rawDtMs = rawDt * 1000;
+
+    // ---- Slow-mo system (mirrors index.js pattern) ----
+    let targetSpeed = 1;
+    if (slowmoRemaining > 0) {
+      slowmoRemaining -= rawDtMs;
+      if (slowmoRemaining < 0) slowmoRemaining = 0;
+      targetSpeed = pointerDown ? SLOWMO_POINTER_SCALE : SLOWMO_TIME_SCALE;
+    } else if (slowmoCooldown > 0) {
+      slowmoCooldown -= rawDtMs;
+      if (slowmoCooldown < 0) slowmoCooldown = 0;
+    }
+    // Smooth lerp — same feel as reference: gameSpeed += (target - gameSpeed) / 22 * lag
+    const lag = rawDt * 60; // normalize to ~60fps
+    gameSpeed += (targetSpeed - gameSpeed) / 22 * lag;
+    gameSpeed = Math.max(0, Math.min(1, gameSpeed));
+
+    renderSlowmoStatus(slowmoRemaining / SLOWMO_DURATION);
+
+    const dt = rawDt * gameSpeed;
+
+    if (gameRunning) {
+      // Spawn — faster during slow-mo so there's more to slice
+      const isSlowmo = slowmoRemaining > 0;
+      const spawnMultiplier = isSlowmo ? 2.5 : 1;
+      spawnTimer += rawDtMs * spawnMultiplier;
+      if (spawnTimer >= nextSpawnDelay) {
+        spawnTimer = 0;
+        nextSpawnDelay = SPAWN_INTERVAL_MIN + Math.random() * (SPAWN_INTERVAL_MAX - SPAWN_INTERVAL_MIN);
+        const count = isSlowmo ? (Math.random() < 0.4 ? 3 : 2) : (Math.random() < 0.10 ? 2 : 1);
+        for (let c = 0; c < count; c++) {
+          setTimeout(() => { if (gameRunning) spawnFruit(); }, c * 120);
+        }
+      }
+
+      // Combo decay
+      if (comboTimer > 0) {
+        comboTimer -= dt;
+        if (comboTimer <= 0) {
+          comboCount = 0;
+          comboLabel.style.opacity = '0';
+        }
+      }
+
+      // Update fruits
+      for (let i = fruits.length - 1; i >= 0; i--) {
+        const f = fruits[i];
+        f.position.x += f.userData.vx * dt;
+        f.position.y += f.userData.vy * dt;
+        f.position.z += f.userData.vz * dt;
+        f.userData.vy += GRAVITY * dt;
+
+        f.rotation.x += f.userData.rotSpeedX * dt;
+        f.rotation.y += f.userData.rotSpeedY * dt;
+        f.rotation.z += f.userData.rotSpeedZ * dt;
+
+        // Fell off screen
+        if (f.position.y < -4 && f.userData.vy < 0) {
+          if (!f.userData.sliced && !f.userData.missed && !f.userData.isBomb) {
+            f.userData.missed = true;
+            misses++;
+            updateMisses();
+            if (misses >= MAX_MISSES) {
+              endGame();
+            }
+          }
+          scene.remove(f);
+          fruits.splice(i, 1);
+        }
+      }
+
+      // Update sliced halves
+      for (let i = slicedParts.length - 1; i >= 0; i--) {
+        const h = slicedParts[i];
+        h.position.x += h.userData.vx * dt;
+        h.position.y += h.userData.vy * dt;
+        h.position.z += (h.userData.vz || 0) * dt;
+        h.userData.vy += GRAVITY * dt;
+        h.rotation.x += (h.userData.rotSpeedX || 0) * dt;
+        h.rotation.y += (h.userData.rotSpeedY || 0) * dt;
+        h.rotation.z += (h.userData.rotSpeedZ || 0) * dt;
+        h.userData.life -= dt * 0.4;
+
+        if (!h.userData._meshes) {
+          h.userData._meshes = [];
+          h.traverse(child => {
+            if (child.isMesh) {
+              child.material.transparent = true;
+              h.userData._meshes.push(child);
+            }
+          });
+        }
+        const opacity = Math.max(0, h.userData.life);
+        for (let m = 0; m < h.userData._meshes.length; m++) {
+          h.userData._meshes[m].material.opacity = opacity;
+        }
+
+        if (h.userData.life <= 0 || h.position.y < -10) {
+          scene.remove(h);
+          slicedParts.splice(i, 1);
+        }
+      }
+
+      // Update juice particles
+      for (let i = juiceParticles.length - 1; i >= 0; i--) {
+        const p = juiceParticles[i];
+        p.position.x += p.userData.vx * dt;
+        p.position.y += p.userData.vy * dt;
+        p.position.z += p.userData.vz * dt;
+        p.userData.vy += GRAVITY * 0.7 * dt;
+        p.userData.life -= dt * p.userData.decay;
+        p.material.opacity = Math.max(0, p.userData.life);
+
+        if (p.userData.life <= 0) {
+          scene.remove(p);
+          juiceParticles.splice(i, 1);
+        }
+      }
+
+      // Update explosion particles
+      for (let i = explosionParts.length - 1; i >= 0; i--) {
+        const p = explosionParts[i];
+        p.position.x += p.userData.vx * rawDt;
+        p.position.y += p.userData.vy * rawDt;
+        p.position.z += (p.userData.vz || 0) * rawDt;
+        p.userData.vy += GRAVITY * 0.4 * rawDt;
+        p.userData.life -= rawDt * p.userData.decay;
+        p.material.opacity = Math.max(0, p.userData.life);
+
+        if (p.userData.isRing) {
+          const s = 1 + (1 - p.userData.life / 0.5) * 8;
+          p.scale.setScalar(s);
+        }
+
+        if (p.userData.life <= 0) {
+          scene.remove(p);
+          explosionParts.splice(i, 1);
+        }
+      }
+    }
+
+    // Draw trail
+    drawTrail();
+
+    renderer.render(scene, camera);
+  }
+
+  clock = new THREE.Clock();
+  animate();
 })();
-
-
-const updateTargetHealth = (target, healthDelta) => {
-	target.health += healthDelta;
-	// Only update stroke on non-wireframe targets.
-	// Showing "glue" is a temporary attempt to display health. For now, there's
-	// no reason to have wireframe targets with high health, so we're fine.
-	if (!target.wireframe) {
-		const strokeWidth = target.health - 1;
-		const strokeColor = makeTargetGlueColor(target);
-		for (let p of target.polys) {
-			p.strokeWidth = strokeWidth;
-			p.strokeColor = strokeColor;
-		}
-	}
-};
-
-
-const returnTarget = target => {
-	target.reset();
-	const pool = target.wireframe ? targetWireframePool : targetPool;
-	pool.get(target.color).push(target);
-};
-
-
-function resetAllTargets() {
-	while(targets.length) {
-		returnTarget(targets.pop());
-	}
-}
-
-// createBurst.js
-// Track all active fragments
-const frags = [];
-
-// Pool inactive fragments by color, using a Map.
-// keys are color objects, and values are arrays of fragments.
-// // Also pool wireframe instances separately.
-const fragPool = new Map(allColors.map(c=>([c, []])));
-const fragWireframePool = new Map(allColors.map(c=>([c, []])));
-
-
-const createBurst = (() => {
-	// Precompute some private data to be reused for all bursts.
-	const basePositions = mengerSpongeSplit({ x:0, y:0, z:0 }, fragRadius*2);
-	const positions = cloneVertices(basePositions);
-	const prevPositions = cloneVertices(basePositions);
-	const velocities = cloneVertices(basePositions);
-
-	const basePositionNormals = basePositions.map(normalize);
-	const positionNormals = cloneVertices(basePositionNormals);
-
-
-	const fragCount = basePositions.length;
-
-	function getFragForTarget(target) {
-		const pool = target.wireframe ? fragWireframePool : fragPool;
-		let frag = pool.get(target.color).pop();
-		if (!frag) {
-			frag = new Entity({
-				model: makeCubeModel({ scale: fragRadius }),
-				color: target.color,
-				wireframe: target.wireframe
-			});
-			frag.color = target.color;
-			frag.wireframe = target.wireframe;
-		}
-		return frag;
-	}
-
-	return (target, force=1) => {
-		// Calculate fragment positions, and what would have been the previous positions
-		// when still a part of the larger target.
-		transformVertices(
-			basePositions, positions,
-			target.x, target.y, target.z,
-			target.rotateX, target.rotateY, target.rotateZ,
-			1, 1, 1
-		);
-		transformVertices(
-			basePositions, prevPositions,
-			target.x - target.xD, target.y - target.yD, target.z - target.zD,
-			target.rotateX - target.rotateXD, target.rotateY - target.rotateYD, target.rotateZ - target.rotateZD,
-			1, 1, 1
-		);
-
-		// Compute velocity of each fragment, based on previous positions.
-		// Will write to `velocities` array.
-		for (let i=0; i<fragCount; i++) {
-			const position = positions[i];
-			const prevPosition = prevPositions[i];
-			const velocity = velocities[i];
-
-			velocity.x = position.x - prevPosition.x;
-			velocity.y = position.y - prevPosition.y;
-			velocity.z = position.z - prevPosition.z;
-		}
-
-
-
-		// Apply target rotation to normals
-		transformVertices(
-			basePositionNormals, positionNormals,
-			0, 0, 0,
-			target.rotateX, target.rotateY, target.rotateZ,
-			1, 1, 1
-		);
-
-
-		for (let i=0; i<fragCount; i++) {
-			const position = positions[i];
-			const velocity = velocities[i];
-			const normal = positionNormals[i];
-
-			const frag = getFragForTarget(target);
-
-			frag.x = position.x;
-			frag.y = position.y;
-			frag.z = position.z;
-			frag.rotateX = target.rotateX;
-			frag.rotateY = target.rotateY;
-			frag.rotateZ = target.rotateZ;
-
-
-			const burstSpeed = 2 * force;
-			const randSpeed = 2 * force;
-			const rotateScale = 0.015;
-			frag.xD = velocity.x + (normal.x * burstSpeed) + (Math.random() * randSpeed);
-			frag.yD = velocity.y + (normal.y * burstSpeed) + (Math.random() * randSpeed);
-			frag.zD = velocity.z + (normal.z * burstSpeed) + (Math.random() * randSpeed);
-			frag.rotateXD = frag.xD * rotateScale;
-			frag.rotateYD = frag.yD * rotateScale;
-			frag.rotateZD = frag.zD * rotateScale;
-
-			frags.push(frag);
-		};
-	}
-})();
-
-
-const returnFrag = frag => {
-	frag.reset();
-	const pool = frag.wireframe ? fragWireframePool : fragPool;
-	pool.get(frag.color).push(frag);
-};
-
-
-
-
-
-// sparks.js
-const sparks = [];
-const sparkPool = [];
-
-
-function addSpark(x, y, xD, yD) {
-	const spark = sparkPool.pop() || {};
-
-	spark.x = x + xD * 0.5;
-	spark.y = y + yD * 0.5;
-	spark.xD = xD;
-	spark.yD = yD;
-	spark.life = random(200, 300);
-	spark.maxLife = spark.life;
-
-	sparks.push(spark);
-
-	return spark;
-}
-
-
-// Spherical spark burst
-function sparkBurst(x, y, count, maxSpeed) {
-	const angleInc = TAU / count;
-	for (let i=0; i<count; i++) {
-		const angle = i * angleInc + angleInc * Math.random();
-		const speed = (1 - Math.random() ** 3) * maxSpeed;
-		addSpark(
-			x,
-			y,
-			Math.sin(angle) * speed,
-			Math.cos(angle) * speed
-		);
-	}
-}
-
-
-// Make a target "leak" sparks from all vertices.
-// This is used to create the effect of target glue "shedding".
-let glueShedVertices;
-function glueShedSparks(target) {
-	if (!glueShedVertices) {
-		glueShedVertices = cloneVertices(target.vertices);
-	} else {
-		copyVerticesTo(target.vertices, glueShedVertices);
-	}
-
-	glueShedVertices.forEach(v => {
-		if (Math.random() < 0.4) {
-			projectVertex(v);
-			addSpark(
-				v.x,
-				v.y,
-				random(-12, 12),
-				random(-12, 12)
-			);
-		}
-	});
-}
-
-function returnSpark(spark) {
-	sparkPool.push(spark);
-}
-
-
-
-
-
-// hud.js
-const hudContainerNode = $('.hud');
-
-function setHudVisibility(visible) {
-	if (visible) {
-		hudContainerNode.style.display = 'block';
-	} else {
-		hudContainerNode.style.display = 'none';
-	}
-}
-
-
-///////////
-// Score //
-///////////
-const scoreNode = $('.score-lbl');
-const cubeCountNode = $('.cube-count-lbl');
-
-function renderScoreHud() {
-	if (isCasualGame()) {
-		scoreNode.style.display = 'none';
-		cubeCountNode.style.opacity = 1;
-	} else {
-		scoreNode.innerText = `SCORE: ${state.game.score}`;
-		scoreNode.style.display = 'block';
-		cubeCountNode.style.opacity = 0.65 ;
-	}
-	cubeCountNode.innerText = `CUBES SMASHED: ${state.game.cubeCount}`;
-}
-
-renderScoreHud();
-
-
-//////////////////
-// Pause Button //
-//////////////////
-
-handlePointerDown($('.pause-btn'), () => pauseGame());
-
-
-////////////////////
-// Slow-Mo Status //
-////////////////////
-
-const slowmoNode = $('.slowmo');
-const slowmoBarNode = $('.slowmo__bar');
-
-function renderSlowmoStatus(percentRemaining) {
-	slowmoNode.style.opacity = percentRemaining === 0 ? 0 : 1;
-	slowmoBarNode.style.transform = `scaleX(${percentRemaining.toFixed(3)})`;
-}
-
-// menus.js
-// Top-level menu containers
-const menuContainerNode = $('.menus');
-const menuMainNode = $('.menu--main');
-const menuPauseNode = $('.menu--pause');
-const menuScoreNode = $('.menu--score');
-
-const finalScoreLblNode = $('.final-score-lbl');
-const highScoreLblNode = $('.high-score-lbl');
-
-
-
-function showMenu(node) {
-	node.classList.add('active');
-}
-
-function hideMenu(node) {
-	node.classList.remove('active');
-}
-
-function renderMenus() {
-	hideMenu(menuMainNode);
-	hideMenu(menuPauseNode);
-	hideMenu(menuScoreNode);
-
-	switch (state.menus.active) {
-		case MENU_MAIN:
-			showMenu(menuMainNode);
-			break;
-		case MENU_PAUSE:
-			showMenu(menuPauseNode);
-			break;
-		case MENU_SCORE:
-			finalScoreLblNode.textContent = formatNumber(state.game.score);
-			if (isNewHighScore()) {
-				highScoreLblNode.textContent = 'New High Score!';
-			} else {
-				highScoreLblNode.textContent = `High Score: ${formatNumber(getHighScore())}`;
-			}
-			showMenu(menuScoreNode);
-			break;
-	}
-
-	setHudVisibility(!isMenuVisible());
-	menuContainerNode.classList.toggle('has-active', isMenuVisible());
-	menuContainerNode.classList.toggle('interactive-mode', isMenuVisible() && pointerIsDown);
-}
-
-renderMenus();
-
-
-
-////////////////////
-// Button Actions //
-////////////////////
-
-// Main Menu
-handleClick($('.play-normal-btn'), () => {
-	setGameMode(GAME_MODE_RANKED);
-	setActiveMenu(null);
-	resetGame();
-});
-
-handleClick($('.play-casual-btn'), () => {
-	setGameMode(GAME_MODE_CASUAL);
-	setActiveMenu(null);
-	resetGame();
-});
-
-// Pause Menu
-handleClick($('.resume-btn'), () => resumeGame());
-handleClick($('.menu-btn--pause'), () => setActiveMenu(MENU_MAIN));
-
-// Score Menu
-handleClick($('.play-again-btn'), () => {
-	setActiveMenu(null);
-	resetGame();
-});
-
-handleClick($('.menu-btn--score'), () => setActiveMenu(MENU_MAIN));
-
-////////////////////
-// Button Actions //
-////////////////////
-
-// Main Menu
-handleClick($('.play-normal-btn'), () => {
-	setGameMode(GAME_MODE_RANKED);
-	setActiveMenu(null);
-	resetGame();
-});
-
-handleClick($('.play-casual-btn'), () => {
-	setGameMode(GAME_MODE_CASUAL);
-	setActiveMenu(null);
-	resetGame();
-});
-
-// Pause Menu
-handleClick($('.resume-btn'), () => resumeGame());
-handleClick($('.menu-btn--pause'), () => setActiveMenu(MENU_MAIN));
-
-// Score Menu
-handleClick($('.play-again-btn'), () => {
-	setActiveMenu(null);
-	resetGame();
-});
-
-handleClick($('.menu-btn--score'), () => setActiveMenu(MENU_MAIN));
-
-
-
-
-
-// actions.js
-//////////////////
-// MENU ACTIONS //
-//////////////////
-
-function setActiveMenu(menu) {
-	state.menus.active = menu;
-	renderMenus();
-}
-
-
-/////////////////
-// HUD ACTIONS //
-/////////////////
-
-function setScore(score) {
-	state.game.score = score;
-	renderScoreHud();
-}
-
-function incrementScore(inc) {
-	if (isInGame()) {
-		state.game.score += inc;
-		if (state.game.score < 0) {
-			state.game.score = 0;
-		}
-		renderScoreHud();
-	}
-}
-
-function setCubeCount(count) {
-	state.game.cubeCount = count;
-	renderScoreHud();
-}
-
-function incrementCubeCount(inc) {
-	if (isInGame()) {
-		state.game.cubeCount += inc;
-		renderScoreHud();
-	}
-}
-
-
-//////////////////
-// GAME ACTIONS //
-//////////////////
-
-function setGameMode(mode) {
-	state.game.mode = mode;
-}
-
-function resetGame() {
-	resetAllTargets();
-	state.game.time = 0;
-	resetAllCooldowns();
-	setScore(0);
-	setCubeCount(0);
-	spawnTime = getSpawnDelay();
-}
-
-function pauseGame() {
-	isInGame() && setActiveMenu(MENU_PAUSE);
-}
-
-function resumeGame() {
-	isPaused() && setActiveMenu(null);
-}
-
-function endGame() {
-	handleCanvasPointerUp();
-	if (isNewHighScore()) {
-		setHighScore(state.game.score);
-	}
-	setActiveMenu(MENU_SCORE);
-}
-
-////////////////////////
-// KEYBOARD SHORTCUTS //
-////////////////////////
-window.addEventListener('keydown', event => {
-	if (event.key === 'p') {
-		isPaused() ? resumeGame() : pauseGame();
-	}
-});
-
-// tick.js
-let spawnTime = 0;
-const maxSpawnX = 450;
-const pointerDelta = { x: 0, y: 0 };
-const pointerDeltaScaled = { x: 0, y: 0 };
-
-// Temp slowmo state. Should be relocated once this stabilizes.
-const slowmoDuration = 1500;
-let slowmoRemaining = 0;
-let spawnExtra = 0;
-const spawnExtraDelay = 300;
-let targetSpeed = 1;
-
-
-function tick(width, height, simTime, simSpeed, lag) {
-	PERF_START('frame');
-	PERF_START('tick');
-
-	state.game.time += simTime;
-
-	if (slowmoRemaining > 0) {
-		slowmoRemaining -= simTime;
-		if (slowmoRemaining < 0) {
-			slowmoRemaining = 0;
-		}
-		targetSpeed = pointerIsDown ? 0.075 : 0.3;
-	} else {
-		const menuPointerDown = isMenuVisible() && pointerIsDown;
-		targetSpeed = menuPointerDown ? 0.025 : 1;
-	}
-
-	renderSlowmoStatus(slowmoRemaining / slowmoDuration);
-
-	gameSpeed += (targetSpeed - gameSpeed) / 22 * lag;
-	gameSpeed = clamp(gameSpeed, 0, 1);
-
-	const centerX = width / 2;
-	const centerY = height / 2;
-
-	const simAirDrag = 1 - (airDrag * simSpeed);
-	const simAirDragSpark = 1 - (airDragSpark * simSpeed);
-
-	// Pointer Tracking
-	// -------------------
-
-	// Compute speed and x/y deltas.
-	// There is also a "scaled" variant taking game speed into account. This serves two purposes:
-	//  - Lag won't create large spikes in speed/deltas
-	//  - In slow mo, speed is increased proportionately to match "reality". Without this boost,
-	//    it feels like your actions are dampened in slow mo.
-	const forceMultiplier = 1 / (simSpeed * 0.75 + 0.25);
-	pointerDelta.x = 0;
-	pointerDelta.y = 0;
-	pointerDeltaScaled.x = 0;
-	pointerDeltaScaled.y = 0;
-	const lastPointer = touchPoints[touchPoints.length - 1];
-
-	if (pointerIsDown && lastPointer && !lastPointer.touchBreak) {
-		pointerDelta.x = (pointerScene.x - lastPointer.x);
-		pointerDelta.y = (pointerScene.y - lastPointer.y);
-		pointerDeltaScaled.x = pointerDelta.x * forceMultiplier;
-		pointerDeltaScaled.y = pointerDelta.y * forceMultiplier;
-	}
-	const pointerSpeed = Math.hypot(pointerDelta.x, pointerDelta.y);
-	const pointerSpeedScaled = pointerSpeed * forceMultiplier;
-
-	// Track points for later calculations, including drawing trail.
-	touchPoints.forEach(p => p.life -= simTime);
-
-	if (pointerIsDown) {
-		touchPoints.push({
-			x: pointerScene.x,
-			y: pointerScene.y,
-			life: touchPointLife
-		});
-	}
-
-	while (touchPoints[0] && touchPoints[0].life <= 0) {
-		touchPoints.shift();
-	}
-
-
-	// Entity Manipulation
-	// --------------------
-	PERF_START('entities');
-
-	// Spawn targets
-	spawnTime -= simTime;
-	if (spawnTime <= 0) {
-		if (spawnExtra > 0) {
-			spawnExtra--;
-			spawnTime = spawnExtraDelay;
-		} else {
-			spawnTime = getSpawnDelay();
-		}
-		const target = getTarget();
-		const spawnRadius = Math.min(centerX * 0.8, maxSpawnX);
-		target.x = (Math.random() * spawnRadius * 2 - spawnRadius);
-		target.y = centerY + targetHitRadius * 2;
-		target.z = (Math.random() * targetRadius*2 - targetRadius);
-		target.xD = Math.random() * (target.x * -2 / 120);
-		target.yD = -20;
-		targets.push(target);
-	}
-
-	// Animate targets and remove when offscreen
-	const leftBound = -centerX + targetRadius;
-	const rightBound = centerX - targetRadius;
-	const ceiling = -centerY - 120;
-	const boundDamping = 0.4;
-
-	targetLoop:
-	for (let i = targets.length - 1; i >= 0; i--) {
-		const target = targets[i];
-		target.x += target.xD * simSpeed;
-		target.y += target.yD * simSpeed;
-
-		if (target.y < ceiling) {
-			target.y = ceiling;
-			target.yD = 0;
-		}
-
-		if (target.x < leftBound) {
-			target.x = leftBound;
-			target.xD *= -boundDamping;
-		} else if (target.x > rightBound) {
-			target.x = rightBound;
-			target.xD *= -boundDamping;
-		}
-
-		if (target.z < backboardZ) {
-			target.z = backboardZ;
-			target.zD *= -boundDamping;
-		}
-
-		target.yD += gravity * simSpeed;
-		target.rotateX += target.rotateXD * simSpeed;
-		target.rotateY += target.rotateYD * simSpeed;
-		target.rotateZ += target.rotateZD * simSpeed;
-		target.transform();
-		target.project();
-
-		// Remove if offscreen
-		if (target.y > centerY + targetHitRadius * 2) {
-			targets.splice(i, 1);
-			returnTarget(target);
-			if (isInGame()) {
-				if (isCasualGame()) {
-					incrementScore(-25);
-				} else {
-					endGame();
-				}
-			}
-			continue;
-		}
-
-
-		// If pointer is moving really fast, we want to hittest multiple points along the path.
-		// We can't use scaled pointer speed to determine this, since we care about actual screen
-		// distance covered.
-		const hitTestCount = Math.ceil(pointerSpeed / targetRadius * 2);
-		// Start loop at `1` and use `<=` check, so we skip 0% and end up at 100%.
-		// This omits the previous point position, and includes the most recent.
-		for (let ii=1; ii<=hitTestCount; ii++) {
-			const percent = 1 - (ii / hitTestCount);
-			const hitX = pointerScene.x - pointerDelta.x * percent;
-			const hitY = pointerScene.y - pointerDelta.y * percent;
-			const distance = Math.hypot(
-				hitX - target.projected.x,
-				hitY - target.projected.y
-			);
-
-			if (distance <= targetHitRadius) {
-				// Hit! (though we don't want to allow hits on multiple sequential frames)
-				if (!target.hit) {
-					target.hit = true;
-
-					target.xD += pointerDeltaScaled.x * hitDampening;
-					target.yD += pointerDeltaScaled.y * hitDampening;
-					target.rotateXD += pointerDeltaScaled.y * 0.001;
-					target.rotateYD += pointerDeltaScaled.x * 0.001;
-
-					const sparkSpeed = 7 + pointerSpeedScaled * 0.125;
-
-					if (pointerSpeedScaled > minPointerSpeed) {
-						target.health--;
-						incrementScore(10);
-
-						if (target.health <= 0) {
-							incrementCubeCount(1);
-							createBurst(target, forceMultiplier);
-							sparkBurst(hitX, hitY, 8, sparkSpeed);
-							if (target.wireframe) {
-								slowmoRemaining = slowmoDuration;
-								spawnTime = 0;
-								spawnExtra = 2;
-							}
-							targets.splice(i, 1);
-							returnTarget(target);
-						} else {
-							sparkBurst(hitX, hitY, 8, sparkSpeed);
-							glueShedSparks(target);
-							updateTargetHealth(target, 0);
-						}
-					} else {
-						incrementScore(5);
-						sparkBurst(hitX, hitY, 3, sparkSpeed);
-					}
-				}
-				// Break the current loop and continue the outer loop.
-				// This skips to processing the next target.
-				continue targetLoop;
-			}
-		}
-
-		// This code will only run if target hasn't been "hit".
-		target.hit = false;
-	}
-
-	// Animate fragments and remove when offscreen.
-	const fragBackboardZ = backboardZ + fragRadius;
-	// Allow fragments to move off-screen to sides for a while, since shadows are still visible.
-	const fragLeftBound = -width;
-	const fragRightBound = width;
-
-	for (let i = frags.length - 1; i >= 0; i--) {
-		const frag = frags[i];
-		frag.x += frag.xD * simSpeed;
-		frag.y += frag.yD * simSpeed;
-		frag.z += frag.zD * simSpeed;
-
-		frag.xD *= simAirDrag;
-		frag.yD *= simAirDrag;
-		frag.zD *= simAirDrag;
-
-		if (frag.y < ceiling) {
-			frag.y = ceiling;
-			frag.yD = 0;
-		}
-
-		if (frag.z < fragBackboardZ) {
-			frag.z = fragBackboardZ;
-			frag.zD *= -boundDamping;
-		}
-
-		frag.yD += gravity * simSpeed;
-		frag.rotateX += frag.rotateXD * simSpeed;
-		frag.rotateY += frag.rotateYD * simSpeed;
-		frag.rotateZ += frag.rotateZD * simSpeed;
-		frag.transform();
-		frag.project();
-
-		// Removal conditions
-		if (
-			// Bottom of screen
-			frag.projected.y > centerY + targetHitRadius ||
-			// Sides of screen
-			frag.projected.x < fragLeftBound ||
-			frag.projected.x > fragRightBound ||
-			// Too close to camera
-			frag.z > cameraFadeEndZ
-		) {
-			frags.splice(i, 1);
-			returnFrag(frag);
-			continue;
-		}
-	}
-
-	// 2D sparks
-	for (let i = sparks.length - 1; i >= 0; i--) {
-		const spark = sparks[i];
-		spark.life -= simTime;
-		if (spark.life <= 0) {
-			sparks.splice(i, 1);
-			returnSpark(spark);
-			continue;
-		}
-		spark.x += spark.xD * simSpeed;
-		spark.y += spark.yD * simSpeed;
-		spark.xD *= simAirDragSpark;
-		spark.yD *= simAirDragSpark;
-		spark.yD += gravity * simSpeed;
-	}
-
-	PERF_END('entities');
-
-	// 3D transforms
-	// -------------------
-
-	PERF_START('3D');
-
-	// Aggregate all scene vertices/polys
-	allVertices.length = 0;
-	allPolys.length = 0;
-	allShadowVertices.length = 0;
-	allShadowPolys.length = 0;
-	targets.forEach(entity => {
-		allVertices.push(...entity.vertices);
-		allPolys.push(...entity.polys);
-		allShadowVertices.push(...entity.shadowVertices);
-		allShadowPolys.push(...entity.shadowPolys);
-	});
-
-	frags.forEach(entity => {
-		allVertices.push(...entity.vertices);
-		allPolys.push(...entity.polys);
-		allShadowVertices.push(...entity.shadowVertices);
-		allShadowPolys.push(...entity.shadowPolys);
-	});
-
-	// Scene calculations/transformations
-	allPolys.forEach(p => computePolyNormal(p, 'normalWorld'));
-	allPolys.forEach(computePolyDepth);
-	allPolys.sort((a, b) => b.depth - a.depth);
-
-	// Perspective projection
-	allVertices.forEach(projectVertex);
-
-	allPolys.forEach(p => computePolyNormal(p, 'normalCamera'));
-
-	PERF_END('3D');
-
-	PERF_START('shadows');
-
-	// Rotate shadow vertices to light source perspective
-	transformVertices(
-		allShadowVertices,
-		allShadowVertices,
-		0, 0, 0,
-		TAU/8, 0, 0,
-		1, 1, 1
-	);
-
-	allShadowPolys.forEach(p => computePolyNormal(p, 'normalWorld'));
-
-	const shadowDistanceMult = Math.hypot(1, 1);
-	const shadowVerticesLength = allShadowVertices.length;
-	for (let i=0; i<shadowVerticesLength; i++) {
-		const distance = allVertices[i].z - backboardZ;
-		allShadowVertices[i].z -= shadowDistanceMult * distance;
-	}
-	transformVertices(
-		allShadowVertices,
-		allShadowVertices,
-		0, 0, 0,
-		-TAU/8, 0, 0,
-		1, 1, 1
-	);
-	allShadowVertices.forEach(projectVertex);
-
-	PERF_END('shadows');
-
-	PERF_END('tick');
-}
-
-// draw.js
-function draw(ctx, width, height, viewScale) {
-	PERF_START('draw');
-
-	const halfW = width / 2;
-	const halfH = height / 2;
-
-
-	// 3D Polys
-	// ---------------
-	ctx.lineJoin = 'bevel';
-
-	PERF_START('drawShadows');
-	ctx.fillStyle = shadowColor;
-	ctx.strokeStyle = shadowColor;
-	allShadowPolys.forEach(p => {
-		if (p.wireframe) {
-			ctx.lineWidth = 2;
-			ctx.beginPath();
-			const { vertices } = p;
-			const vCount = vertices.length;
-			const firstV = vertices[0];
-			ctx.moveTo(firstV.x, firstV.y);
-			for (let i=1; i<vCount; i++) {
-				const v = vertices[i];
-				ctx.lineTo(v.x, v.y);
-			}
-			ctx.closePath();
-			ctx.stroke();
-		} else {
-			ctx.beginPath();
-			const { vertices } = p;
-			const vCount = vertices.length;
-			const firstV = vertices[0];
-			ctx.moveTo(firstV.x, firstV.y);
-			for (let i=1; i<vCount; i++) {
-				const v = vertices[i];
-				ctx.lineTo(v.x, v.y);
-			}
-			ctx.closePath();
-			ctx.fill();
-		}
-	});
-	PERF_END('drawShadows');
-
-	PERF_START('drawPolys');
-
-	allPolys.forEach(p => {
-		if (!p.wireframe && p.normalCamera.z < 0) return;
-
-		if (p.strokeWidth !== 0) {
-			ctx.lineWidth = p.normalCamera.z < 0 ? p.strokeWidth * 0.5 : p.strokeWidth;
-			ctx.strokeStyle = p.normalCamera.z < 0 ? p.strokeColorDark : p.strokeColor;
-		}
-
-		const { vertices } = p;
-		const lastV = vertices[vertices.length - 1];
-		const fadeOut = p.middle.z > cameraFadeStartZ;
-
-		if (!p.wireframe) {
-			const normalLight = p.normalWorld.y * 0.5 + p.normalWorld.z * -0.5;
-			const lightness = normalLight > 0
-				? 0.1
-				: ((normalLight ** 32 - normalLight) / 2) * 0.9 + 0.1;
-			ctx.fillStyle = shadeColor(p.color, lightness);
-		}
-
-		// Fade out polys close to camera. `globalAlpha` must be reset later.
-		if (fadeOut) {
-			// If polygon gets really close to camera (outside `cameraFadeRange`) the alpha
-			// can go negative, which has the appearance of alpha = 1. So, we'll clamp it at 0.
-			ctx.globalAlpha = Math.max(0, 1 - (p.middle.z - cameraFadeStartZ) / cameraFadeRange);
-		}
-
-		ctx.beginPath();
-		ctx.moveTo(lastV.x, lastV.y);
-		for (let v of vertices) {
-			ctx.lineTo(v.x, v.y);
-		}
-
-		if (!p.wireframe) {
-			ctx.fill();
-		}
-		if (p.strokeWidth !== 0) {
-			ctx.stroke();
-		}
-
-		if (fadeOut) {
-			ctx.globalAlpha = 1;
-		}
-	});
-	PERF_END('drawPolys');
-
-
-	PERF_START('draw2D');
-
-	// 2D Sparks
-	ctx.strokeStyle = sparkColor;
-	ctx.lineWidth = sparkThickness;
-	ctx.beginPath();
-	sparks.forEach(spark => {
-		ctx.moveTo(spark.x, spark.y);
-		// Shrink sparks to zero length as they die.
-		// Speed up shrinking as life approaches 0 (root curve).
-		// Note that sparks already get smaller over time as their speed slows
-		// down from damping. So this is like a double scale down. To counter this
-		// a bit and keep the sparks larger for longer, we'll also increase the scale
-		// a bit after applying the root curve.
-		const scale = (spark.life / spark.maxLife) ** 0.5 * 1.5;
-		ctx.lineTo(spark.x - spark.xD*scale, spark.y - spark.yD*scale);
-
-	});
-	ctx.stroke();
-
-
-	// Touch Strokes
-	// ---------------
-
-	ctx.strokeStyle = touchTrailColor;
-	const touchPointCount = touchPoints.length;
-	for (let i=1; i<touchPointCount; i++) {
-		const current = touchPoints[i];
-		const prev = touchPoints[i-1];
-		if (current.touchBreak || prev.touchBreak) {
-			continue;
-		}
-		const scale = current.life / touchPointLife;
-		ctx.lineWidth = scale * touchTrailThickness;
-		ctx.beginPath();
-		ctx.moveTo(prev.x, prev.y);
-		ctx.lineTo(current.x, current.y);
-		ctx.stroke();
-	}
-
-	PERF_END('draw2D');
-
-	PERF_END('draw');
-	PERF_END('frame');
-
-	// Display performance updates.
-	PERF_UPDATE();
-}
-
-// canvas.js
-function setupCanvas() {
-	const ctx = canvas.getContext('2d');
-	// devicePixelRatio alias
-	const dpr = window.devicePixelRatio || 1;
-	// View will be scaled so objects appear sized similarly on all screen sizes.
-	let viewScale;
-	// Dimensions (taking viewScale into account!)
-	let width, height;
-
-	function handleResize() {
-		const w = window.innerWidth;
-		const h = window.innerHeight;
-		viewScale = h / 1000;
-		width = w / viewScale;
-		height = h / viewScale;
-		canvas.width = w * dpr;
-		canvas.height = h * dpr;
-		canvas.style.width = w + 'px';
-		canvas.style.height = h + 'px';
-	}
-
-	// Set initial size
-	handleResize();
-	// resize fullscreen canvas
-	window.addEventListener('resize', handleResize);
-
-
-	// Run game loop
-	let lastTimestamp = 0;
-	function frameHandler(timestamp) {
-		let frameTime = timestamp - lastTimestamp;
-		lastTimestamp = timestamp;
-
-		// always queue another frame
-		raf();
-
-		// If game is paused, we'll still track frameTime (above) but all other
-		// game logic and drawing can be avoided.
-		if (isPaused()) return;
-
-		// make sure negative time isn't reported (first frame can be whacky)
-		if (frameTime < 0) {
-			frameTime = 17;
-		}
-		// - cap minimum framerate to 15fps[~68ms] (assuming 60fps[~17ms] as 'normal')
-		else if (frameTime > 68) {
-			frameTime = 68;
-		}
-
-		const halfW = width / 2;
-		const halfH = height / 2;
-
-		// Convert pointer position from screen to scene coords.
-		pointerScene.x = pointerScreen.x / viewScale - halfW;
-		pointerScene.y = pointerScreen.y / viewScale - halfH;
-
-		const lag = frameTime / 16.6667;
-		const simTime = gameSpeed * frameTime;
-		const simSpeed = gameSpeed * lag;
-		tick(width, height, simTime, simSpeed, lag);
-
-		// Auto clear canvas
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-		// Auto scale drawing for high res displays, and incorporate `viewScale`.
-		// Also shift canvas so (0, 0) is the middle of the screen.
-		// This just works with 3D perspective projection.
-		const drawScale = dpr * viewScale;
-		ctx.scale(drawScale, drawScale);
-		ctx.translate(halfW, halfH);
-		draw(ctx, width, height, viewScale);
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
-	}
-	const raf = () => requestAnimationFrame(frameHandler);
-	// Start loop
-	raf();
-}
-
-
-
-
-
-// interaction.js
-// ============================================================================
-// ============================================================================
-
-// Interaction
-// -----------------------------
-
-function handleCanvasPointerDown(x, y) {
-	if (!pointerIsDown) {
-		pointerIsDown = true;
-		pointerScreen.x = x;
-		pointerScreen.y = y;
-		// On when menus are open, point down/up toggles an interactive mode.
-		// We just need to rerender the menu system for it to respond.
-		if (isMenuVisible()) renderMenus();
-	}
-}
-
-function handleCanvasPointerUp() {
-	if (pointerIsDown) {
-		pointerIsDown = false;
-		touchPoints.push({
-			touchBreak: true,
-			life: touchPointLife
-		});
-		// On when menus are open, point down/up toggles an interactive mode.
-		// We just need to rerender the menu system for it to respond.
-		if (isMenuVisible()) renderMenus();
-	}
-}
-
-function handleCanvasPointerMove(x, y) {
-	if (pointerIsDown) {
-		pointerScreen.x = x;
-		pointerScreen.y = y;
-	}
-}
-
-
-// Use pointer events if available, otherwise fallback to touch events (for iOS).
-if ('PointerEvent' in window) {
-	canvas.addEventListener('pointerdown', event => {
-		event.isPrimary && handleCanvasPointerDown(event.clientX, event.clientY);
-	});
-
-	canvas.addEventListener('pointerup', event => {
-		event.isPrimary && handleCanvasPointerUp();
-	});
-
-	canvas.addEventListener('pointermove', event => {
-		event.isPrimary && handleCanvasPointerMove(event.clientX, event.clientY);
-	});
-
-	// We also need to know if the mouse leaves the page. For this game, it's best if that
-	// cancels a swipe, so essentially acts as a "mouseup" event.
-	document.body.addEventListener('mouseleave', handleCanvasPointerUp);
-} else {
-	let activeTouchId = null;
-	canvas.addEventListener('touchstart', event => {
-		if (!pointerIsDown) {
-			const touch = event.changedTouches[0];
-			activeTouchId = touch.identifier;
-			handleCanvasPointerDown(touch.clientX, touch.clientY);
-		}
-	});
-	canvas.addEventListener('touchend', event => {
-		for (let touch of event.changedTouches) {
-			if (touch.identifier === activeTouchId) {
-				handleCanvasPointerUp();
-				break;
-			}
-		}
-	});
-	canvas.addEventListener('touchmove', event => {
-		for (let touch of event.changedTouches) {
-			if (touch.identifier === activeTouchId) {
-				handleCanvasPointerMove(touch.clientX, touch.clientY);
-				event.preventDefault();
-				break;
-			}
-		}
-	}, { passive: false });
-}
-
-setupCanvas();
