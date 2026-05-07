@@ -88,8 +88,8 @@ function splitCombinedGLB(root, label) {
       clone.matrix.copy(e.mesh.matrixWorld);
       clone.matrix.decompose(clone.position, clone.quaternion, clone.scale);
       if (clone.material) clone.material.side = THREE.DoubleSide;
-      clone.castShadow = true;
-      clone.receiveShadow = true;
+      
+      
       g.add(clone);
     }
     return g;
@@ -114,7 +114,7 @@ gltfLoader.load('3d_model/orange_model.glb', (gltf) => {
 gltfLoader.load('3d_model/watermelon.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   watermelonModel = model;
   _onModelSettled();
@@ -126,7 +126,7 @@ gltfLoader.load('3d_model/watermelon.glb', (gltf) => {
 gltfLoader.load('3d_model/half_of_juicy_watermelon.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   watermelonHalfModel = model;
   _onModelSettled();
@@ -139,7 +139,7 @@ gltfLoader.load('3d_model/dragon_fruit.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
     if (child.isMesh) {
-      child.castShadow = true; child.receiveShadow = true;
+       
       if (child.material) {
         child.material.side = THREE.DoubleSide;
         if (child.material.transparent && child.material.opacity === 0) child.material.opacity = 1;
@@ -156,7 +156,7 @@ gltfLoader.load('3d_model/dragon_fruit.glb', (gltf) => {
 gltfLoader.load('3d_model/papaya_fruit.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   papayaWholeModel = model;
   _onModelSettled();
@@ -168,7 +168,7 @@ gltfLoader.load('3d_model/papaya_fruit.glb', (gltf) => {
 gltfLoader.load('3d_model/half_papaya.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   papayaHalfModel = model;
   _onModelSettled();
@@ -180,7 +180,7 @@ gltfLoader.load('3d_model/half_papaya.glb', (gltf) => {
 gltfLoader.load('3d_model/mango.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   mangoWholeModel = model;
   _onModelSettled();
@@ -192,7 +192,7 @@ gltfLoader.load('3d_model/mango.glb', (gltf) => {
 gltfLoader.load('3d_model/half_mango.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   mangoHalfModel = model;
   _onModelSettled();
@@ -204,7 +204,7 @@ gltfLoader.load('3d_model/half_mango.glb', (gltf) => {
 gltfLoader.load('3d_model/kiwi.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   kiwiWholeModel = model;
   _onModelSettled();
@@ -216,7 +216,7 @@ gltfLoader.load('3d_model/kiwi.glb', (gltf) => {
 gltfLoader.load('3d_model/half_kiwi.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   kiwiHalfModel = model;
   _onModelSettled();
@@ -226,7 +226,13 @@ gltfLoader.load('3d_model/half_kiwi.glb', (gltf) => {
 });
 
 // Pomegranate — single GLB containing BOTH whole and half side-by-side.
-gltfLoader.load('3d_model/pomegranate.glb', (gltf) => {
+// Uses a dedicated loader with DRACOLoader because Sketchfab auto-applies Draco compression.
+const dracoLoader = new THREE.DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+const pomegranateLoader = new THREE.GLTFLoader();
+pomegranateLoader.setDRACOLoader(dracoLoader);
+
+pomegranateLoader.load('3d_model/pomegranate.glb', (gltf) => {
   const split = splitCombinedGLB(gltf.scene, 'Pomegranate');
   if (split) { pomegranateWholeModel = split.whole; pomegranateHalfModel = split.half; }
   _onModelSettled();
@@ -238,7 +244,7 @@ gltfLoader.load('3d_model/pomegranate.glb', (gltf) => {
 gltfLoader.load('3d_model/comical_bomb.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   comicalBombModel = model;
   _onModelSettled();
@@ -250,7 +256,7 @@ gltfLoader.load('3d_model/comical_bomb.glb', (gltf) => {
 gltfLoader.load('3d_model/fat_man_bomb.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; if (child.material) child.material.side = THREE.DoubleSide; }
+    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
   });
   fatManBombModel = model;
   _onModelSettled();

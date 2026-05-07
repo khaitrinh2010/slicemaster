@@ -49,7 +49,7 @@ export function createApple() {
     envMap: envMap, envMapIntensity: 0.5,
   });
   const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.castShadow = true;
+  
   group.add(body);
 
   const stemGeo = new THREE.CylinderGeometry(0.025, 0.04, 0.32, 8);
@@ -91,7 +91,7 @@ export function createOrange() {
     model.traverse(child => {
       if (child.isMesh) {
         child.material = child.material.clone();
-        child.castShadow = true;
+        
       }
     });
     const box = new THREE.Box3().setFromObject(model);
@@ -112,7 +112,7 @@ export function createOrange() {
       envMap: envMap, envMapIntensity: 0.25,
     });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.castShadow = true;
+    
     group.add(body);
   }
 
@@ -175,7 +175,7 @@ export function createBanana() {
     envMap: envMap, envMapIntensity: 0.3,
   });
   const body = new THREE.Mesh(tubeGeo, bodyMat);
-  body.castShadow = true;
+  
   group.add(body);
 
   const capGeo = new THREE.SphereGeometry(0.18, 10, 10);
@@ -217,7 +217,7 @@ export function createWatermelon() {
     model.traverse(child => {
       if (child.isMesh) {
         child.material = child.material.clone();
-        child.castShadow = true;
+        
       }
     });
     const box = new THREE.Box3().setFromObject(model);
@@ -257,7 +257,7 @@ export function createWatermelon() {
     });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.scale.set(1, 0.85, 0.9);
-    body.castShadow = true;
+    
     group.add(body);
   }
 
@@ -280,7 +280,7 @@ export function createDragonFruit() {
     model.traverse(child => {
       if (child.isMesh) {
         child.material = child.material.clone();
-        child.castShadow = true;
+        
       }
     });
     const box = new THREE.Box3().setFromObject(model);
@@ -337,7 +337,7 @@ export function createDragonFruit() {
       clearcoat: 0.4, clearcoatRoughness: 0.2,
     });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.castShadow = true;
+    
     group.add(body);
 
     const petalRows = [
@@ -365,7 +365,7 @@ export function createDragonFruit() {
         if (bodyT < 0.3) bodyR *= 0.7 + bodyT * 1.0;
         petal.position.set(Math.cos(theta) * bodyR, row.y, Math.sin(theta) * bodyR);
         petal.lookAt(Math.cos(theta) * (bodyR + 1), row.y + row.tilt, Math.sin(theta) * (bodyR + 1));
-        petal.castShadow = true;
+        
         group.add(petal);
       }
     }
@@ -396,7 +396,7 @@ export function createPapaya() {
     model.traverse(child => {
       if (child.isMesh) {
         child.material = child.material.clone();
-        child.castShadow = true;
+        
       }
     });
     const box = new THREE.Box3().setFromObject(model);
@@ -419,7 +419,7 @@ export function createPapaya() {
     });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.scale.set(0.85, 1.35, 0.85);
-    body.castShadow = true;
+    
     group.add(body);
   }
 
@@ -442,7 +442,7 @@ export function createMango() {
     model.traverse(child => {
       if (child.isMesh) {
         child.material = child.material.clone();
-        child.castShadow = true;
+        
       }
     });
     const box = new THREE.Box3().setFromObject(model);
@@ -464,7 +464,7 @@ export function createMango() {
     });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.scale.set(0.9, 1.25, 0.85);
-    body.castShadow = true;
+    
     group.add(body);
   }
 
@@ -487,7 +487,7 @@ export function createKiwi() {
     model.traverse(child => {
       if (child.isMesh) {
         child.material = child.material.clone();
-        child.castShadow = true;
+        
       }
     });
     const box = new THREE.Box3().setFromObject(model);
@@ -509,7 +509,7 @@ export function createKiwi() {
     });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.scale.set(0.9, 1.15, 0.9);
-    body.castShadow = true;
+    
     group.add(body);
   }
 
@@ -532,7 +532,7 @@ export function createPomegranate() {
     model.traverse(child => {
       if (child.isMesh) {
         child.material = child.material.clone();
-        child.castShadow = true;
+        
       }
     });
     const box = new THREE.Box3().setFromObject(model);
@@ -553,7 +553,7 @@ export function createPomegranate() {
       envMap: envMap, envMapIntensity: 0.3,
     });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.castShadow = true;
+    
     group.add(body);
   }
 

@@ -160,7 +160,7 @@ import { slicedParts } from './constants.js';
       side: THREE.DoubleSide
     });
     const tubeMesh = new THREE.Mesh(tubeGeo, skinMat);
-    tubeMesh.castShadow = true;
+    
     half.add(tubeMesh);
 
     // Flat flesh face — thicker visible cross-section along the cut
@@ -231,7 +231,7 @@ import { slicedParts } from './constants.js';
       model.traverse(child => {
         if (child.isMesh) {
           child.material = child.material.clone();
-          child.castShadow = true;
+          
         }
       });
 
@@ -305,7 +305,7 @@ import { slicedParts } from './constants.js';
       model.traverse(child => {
         if (child.isMesh) {
           child.material = child.material.clone();
-          child.castShadow = true;
+          
         }
       });
 
@@ -439,7 +439,7 @@ import { slicedParts } from './constants.js';
       model.traverse(child => {
         if (child.isMesh) {
           child.material = child.material.clone();
-          child.castShadow = true;
+          
         }
       });
 
@@ -508,7 +508,7 @@ import { slicedParts } from './constants.js';
       model.traverse(child => {
         if (child.isMesh) {
           child.material = child.material.clone();
-          child.castShadow = true;
+          
         }
       });
 
@@ -577,7 +577,7 @@ import { slicedParts } from './constants.js';
       model.traverse(child => {
         if (child.isMesh) {
           child.material = child.material.clone();
-          child.castShadow = true;
+          
         }
       });
 
@@ -646,7 +646,7 @@ import { slicedParts } from './constants.js';
       model.traverse(child => {
         if (child.isMesh) {
           child.material = child.material.clone();
-          child.castShadow = true;
+          
         }
       });
 
@@ -770,7 +770,7 @@ import { slicedParts } from './constants.js';
       side: THREE.DoubleSide
     });
     const hemiMesh = new THREE.Mesh(hemiGeo, hemiMat);
-    hemiMesh.castShadow = true;
+    
     // Rotate so the flat cut faces sideways (X axis) instead of up/down
     hemiMesh.rotation.z = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
     half.add(hemiMesh);

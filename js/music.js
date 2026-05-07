@@ -40,6 +40,14 @@ export function stopBackgroundMusic() {
   backgroundMusicStarted = false;
 }
 
+let _muted = false;
+export function toggleMute() {
+  _muted = !_muted;
+  music.muted = _muted;
+  backgroundMusic.muted = _muted;
+  return _muted;
+}
+
 // Slice sound effect — uses Web Audio API for extra-loud playback
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const SLICE_GAIN = 3.0; // 3x louder than normal max

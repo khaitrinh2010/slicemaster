@@ -85,6 +85,14 @@ export function initSync(deps) {
     });
   });
 
+  // Either player can request a game start
+  squidly.firebaseOnValue('game/startRequest', (val) => {
+    if (!val || state.gameRunning) return;
+    _modelsReady.then(() => {
+      if (!state.gameRunning && _startGame) _startGame();
+    });
+  });
+
   // Non-host receives fruit spawns from host
   squidly.firebaseOnValue('game/spawn', (val) => {
     if (!val || _isHost === null || _isHost) return;
@@ -178,6 +186,11 @@ export function publishMiss() {
 export function publishScore() {
   if (!squidly || !_isHost) return;
   squidly.firebaseSet('game/score', state.score);
+}
+
+export function publishStartRequest() {
+  if (!squidly) return;
+  squidly.firebaseSet('game/startRequest', Date.now());
 }
 
 export function publishGameStart() {

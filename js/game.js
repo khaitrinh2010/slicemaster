@@ -19,9 +19,9 @@ import { initSquidly, saveHighScore } from './squidly.js';
 import {
   initSync, getIsHost, resetSync,
   assignNetId, registerFruit, publishSpawn,
-  publishScore, publishMiss, publishGameStart, publishGameOver
+  publishScore, publishMiss, publishGameStart, publishGameOver, publishStartRequest
 } from './sync.js';
-import { startMusic, stopMusic, playBackgroundMusic, stopBackgroundMusic } from './music.js';
+import { startMusic, stopMusic, playBackgroundMusic, stopBackgroundMusic, toggleMute } from './music.js';
 import { modelsReady } from './models.js';
 
 // ---- DOM ----
@@ -164,6 +164,7 @@ function startGame() {
   state.gameRunning = true;
 
   resetSync();
+  publishStartRequest();
   publishGameStart();
 
   playBackgroundMusic(); // Start background music
@@ -218,6 +219,12 @@ function menuHandler() {
 
 // ---- Button Handlers ----
 const squidlyApi = window.SquidlyAPI || null;
+const btnMute = document.getElementById('btn-mute');
+btnMute.addEventListener('click', () => {
+  const muted = toggleMute();
+  btnMute.textContent = muted ? '🔇' : '🔊';
+});
+
 const btnRestart = document.getElementById('btn-restart');
 const btnMenu = document.getElementById('btn-menu');
 const btnStart = document.getElementById('btn-start');
