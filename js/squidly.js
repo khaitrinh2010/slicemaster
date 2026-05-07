@@ -8,7 +8,9 @@ import { spawnJuice, spawnExplosion } from './particles.js';
 import { createHalf } from './slicing.js';
 import { fruitScores } from './fruits.js';
 import { playSlice } from './music.js';
-import { publishSlice, ensurePlayerSubscribed, getMyUserId } from './sync.js';
+import { publishSlice } from './sync.js';
+
+export const remoteTrail = [];
 
 const squidly = window.SquidlyAPI || null;
 
@@ -33,13 +35,11 @@ function initGazeListener() {
   squidly.addCursorListener((data) => {
     if (!state.gameRunning) return;
 
-    // Discover new players so sync.js can subscribe to their slice channels
-    if (data.user) ensurePlayerSubscribed(data.user);
-
-    // Only apply gaze slicing for our own cursor — remote players' slices
-    // arrive via Firebase (game/slices/<userId>) and are applied by sync.js
-    const myId = getMyUserId();
-    if (myId && data.user && data.user !== myId) return;
+    if (data.source === 'remote') {
+      remoteTrail.push({ x: data.x, y: data.y, time: performance.now() });
+      while (remoteTrail.length > TRAIL_LENGTH) remoteTrail.shift();
+      return;
+    }
 
     const x = data.x;
     const y = data.y;

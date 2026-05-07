@@ -426,6 +426,282 @@ import { slicedParts } from './constants.js';
     slicedParts.push(half);
   }
 
+  // ---- Sliced Papaya Half (use papaya GLB half model) ----
+  export function createPapayaHalf(fruitGroup, sliceDir) {
+    const data = fruitGroup.userData;
+    const half = new THREE.Group();
+    half.position.copy(fruitGroup.position);
+    half.rotation.copy(fruitGroup.rotation);
+    half.scale.copy(fruitGroup.scale).multiplyScalar(0.85);
+
+    if (models.papayaHalfModel) {
+      const model = models.papayaHalfModel.clone(true);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) wrapper.scale.setScalar(1.4 / maxDim);
+
+      if (sliceDir < 0) wrapper.scale.x *= -1;
+
+      half.add(wrapper);
+    } else {
+      const radius = data.fruitRadius || 0.9;
+      const hemiGeo = makeHemisphereGeo(radius, sliceDir);
+      const hemiMat = new THREE.MeshStandardMaterial({
+        color: data.skinColor || 0xff9933, roughness: 0.45, side: THREE.DoubleSide
+      });
+      const hemiMesh = new THREE.Mesh(hemiGeo, hemiMat);
+      hemiMesh.rotation.z = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(hemiMesh);
+
+      const cross = createCrossSection(data);
+      cross.rotation.y = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(cross);
+    }
+
+    half.userData.vx = data.vx * 0.3 + sliceDir * (2.5 + Math.random() * 2);
+    half.userData.vy = data.vy * 0.4 + 1.5 + Math.random() * 3;
+    half.userData.vz = (Math.random() - 0.5) * 2;
+    half.userData.rotSpeedX = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedY = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedZ = (Math.random() - 0.5) * 4;
+    half.userData.life = 2.0;
+    half.userData.fruitName = 'papaya';
+    half.userData.fruitRadius = data.fruitRadius;
+    half.userData.skinColor = data.skinColor;
+    half.userData.fleshColor = data.fleshColor;
+    half.userData.seedColor = data.seedColor;
+    half.userData.juiceColor = data.juiceColor;
+    half.userData.fruitColor = data.fruitColor;
+    half.userData.cutLevel = (data.cutLevel || 0) + 1;
+    half.userData.sliced = false;
+
+    scene.add(half);
+    slicedParts.push(half);
+  }
+
+  // ---- Sliced Mango Half (use mango GLB half model) ----
+  export function createMangoHalf(fruitGroup, sliceDir) {
+    const data = fruitGroup.userData;
+    const half = new THREE.Group();
+    half.position.copy(fruitGroup.position);
+    half.rotation.copy(fruitGroup.rotation);
+    half.scale.copy(fruitGroup.scale).multiplyScalar(0.85);
+
+    if (models.mangoHalfModel) {
+      const model = models.mangoHalfModel.clone(true);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) wrapper.scale.setScalar(1.3 / maxDim);
+
+      if (sliceDir < 0) wrapper.scale.x *= -1;
+
+      half.add(wrapper);
+    } else {
+      const radius = data.fruitRadius || 0.85;
+      const hemiGeo = makeHemisphereGeo(radius, sliceDir);
+      const hemiMat = new THREE.MeshStandardMaterial({
+        color: data.skinColor || 0xffc233, roughness: 0.4, side: THREE.DoubleSide
+      });
+      const hemiMesh = new THREE.Mesh(hemiGeo, hemiMat);
+      hemiMesh.rotation.z = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(hemiMesh);
+
+      const cross = createCrossSection(data);
+      cross.rotation.y = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(cross);
+    }
+
+    half.userData.vx = data.vx * 0.3 + sliceDir * (2.5 + Math.random() * 2);
+    half.userData.vy = data.vy * 0.4 + 1.5 + Math.random() * 3;
+    half.userData.vz = (Math.random() - 0.5) * 2;
+    half.userData.rotSpeedX = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedY = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedZ = (Math.random() - 0.5) * 4;
+    half.userData.life = 2.0;
+    half.userData.fruitName = 'mango';
+    half.userData.fruitRadius = data.fruitRadius;
+    half.userData.skinColor = data.skinColor;
+    half.userData.fleshColor = data.fleshColor;
+    half.userData.seedColor = data.seedColor;
+    half.userData.juiceColor = data.juiceColor;
+    half.userData.fruitColor = data.fruitColor;
+    half.userData.cutLevel = (data.cutLevel || 0) + 1;
+    half.userData.sliced = false;
+
+    scene.add(half);
+    slicedParts.push(half);
+  }
+
+  // ---- Sliced Kiwi Half (use kiwi GLB half model) ----
+  export function createKiwiHalf(fruitGroup, sliceDir) {
+    const data = fruitGroup.userData;
+    const half = new THREE.Group();
+    half.position.copy(fruitGroup.position);
+    half.rotation.copy(fruitGroup.rotation);
+    half.scale.copy(fruitGroup.scale).multiplyScalar(0.85);
+
+    if (models.kiwiHalfModel) {
+      const model = models.kiwiHalfModel.clone(true);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) wrapper.scale.setScalar(1.1 / maxDim);
+
+      if (sliceDir < 0) wrapper.scale.x *= -1;
+
+      half.add(wrapper);
+    } else {
+      const radius = data.fruitRadius || 0.75;
+      const hemiGeo = makeHemisphereGeo(radius, sliceDir);
+      const hemiMat = new THREE.MeshStandardMaterial({
+        color: data.skinColor || 0x8b6f3b, roughness: 0.8, side: THREE.DoubleSide
+      });
+      const hemiMesh = new THREE.Mesh(hemiGeo, hemiMat);
+      hemiMesh.rotation.z = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(hemiMesh);
+
+      const cross = createCrossSection(data);
+      cross.rotation.y = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(cross);
+    }
+
+    half.userData.vx = data.vx * 0.3 + sliceDir * (2.5 + Math.random() * 2);
+    half.userData.vy = data.vy * 0.4 + 1.5 + Math.random() * 3;
+    half.userData.vz = (Math.random() - 0.5) * 2;
+    half.userData.rotSpeedX = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedY = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedZ = (Math.random() - 0.5) * 4;
+    half.userData.life = 2.0;
+    half.userData.fruitName = 'kiwi';
+    half.userData.fruitRadius = data.fruitRadius;
+    half.userData.skinColor = data.skinColor;
+    half.userData.fleshColor = data.fleshColor;
+    half.userData.seedColor = data.seedColor;
+    half.userData.juiceColor = data.juiceColor;
+    half.userData.fruitColor = data.fruitColor;
+    half.userData.cutLevel = (data.cutLevel || 0) + 1;
+    half.userData.sliced = false;
+
+    scene.add(half);
+    slicedParts.push(half);
+  }
+
+  // ---- Sliced Pomegranate Half (use pomegranate half extracted from combined GLB) ----
+  export function createPomegranateHalf(fruitGroup, sliceDir) {
+    const data = fruitGroup.userData;
+    const half = new THREE.Group();
+    half.position.copy(fruitGroup.position);
+    half.rotation.copy(fruitGroup.rotation);
+    half.scale.copy(fruitGroup.scale).multiplyScalar(0.85);
+
+    if (models.pomegranateHalfModel) {
+      const model = models.pomegranateHalfModel.clone(true);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.castShadow = true;
+        }
+      });
+
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      const wrapper = new THREE.Group();
+      model.position.set(-center.x, -center.y, -center.z);
+      wrapper.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) wrapper.scale.setScalar(1.2 / maxDim);
+
+      if (sliceDir < 0) wrapper.scale.x *= -1;
+
+      half.add(wrapper);
+    } else {
+      const radius = data.fruitRadius || 0.8;
+      const hemiGeo = makeHemisphereGeo(radius, sliceDir);
+      const hemiMat = new THREE.MeshStandardMaterial({
+        color: data.skinColor || 0xa12f3b, roughness: 0.5, side: THREE.DoubleSide
+      });
+      const hemiMesh = new THREE.Mesh(hemiGeo, hemiMat);
+      hemiMesh.rotation.z = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(hemiMesh);
+
+      const cross = createCrossSection(data);
+      cross.rotation.y = sliceDir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      half.add(cross);
+    }
+
+    half.userData.vx = data.vx * 0.3 + sliceDir * (2.5 + Math.random() * 2);
+    half.userData.vy = data.vy * 0.4 + 1.5 + Math.random() * 3;
+    half.userData.vz = (Math.random() - 0.5) * 2;
+    half.userData.rotSpeedX = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedY = (Math.random() - 0.5) * 4;
+    half.userData.rotSpeedZ = (Math.random() - 0.5) * 4;
+    half.userData.life = 2.0;
+    half.userData.fruitName = 'pomegranate';
+    half.userData.fruitRadius = data.fruitRadius;
+    half.userData.skinColor = data.skinColor;
+    half.userData.fleshColor = data.fleshColor;
+    half.userData.seedColor = data.seedColor;
+    half.userData.juiceColor = data.juiceColor;
+    half.userData.fruitColor = data.fruitColor;
+    half.userData.cutLevel = (data.cutLevel || 0) + 1;
+    half.userData.sliced = false;
+
+    scene.add(half);
+    slicedParts.push(half);
+  }
+
   // ---- Sliced Fruit Halves ----
   export function createHalf(fruitGroup, sliceDir, swipeDX, swipeDY) {
     // Banana gets special slicing
@@ -449,6 +725,30 @@ import { slicedParts } from './constants.js';
     // Orange — use the half GLB model
     if (fruitGroup.userData.fruitName === 'orange') {
       createOrangeHalf(fruitGroup, sliceDir);
+      return;
+    }
+
+    // Papaya — use the half GLB model
+    if (fruitGroup.userData.fruitName === 'papaya') {
+      createPapayaHalf(fruitGroup, sliceDir);
+      return;
+    }
+
+    // Mango — use the half GLB model
+    if (fruitGroup.userData.fruitName === 'mango') {
+      createMangoHalf(fruitGroup, sliceDir);
+      return;
+    }
+
+    // Kiwi — use the half GLB model
+    if (fruitGroup.userData.fruitName === 'kiwi') {
+      createKiwiHalf(fruitGroup, sliceDir);
+      return;
+    }
+
+    // Pomegranate — use the half GLB model
+    if (fruitGroup.userData.fruitName === 'pomegranate') {
+      createPomegranateHalf(fruitGroup, sliceDir);
       return;
     }
 

@@ -1,19 +1,21 @@
 // ============================================================
-// Squidly Multiplayer Sync — N-player
+// Squidly Multiplayer Sync — two-channel (host / participant)
 //
-// Firebase paths (all under the app-sandboxed "appdata/" namespace):
-//   game/running            number  0|1
-//   game/gameOver           number  0|1|2
-//   game/score              number
-//   game/misses             number
-//   game/spawn              string  "netId|type|x|y|vx|vy|vz|rx|ry|rz"
-//   game/slices/<userId>    string  "ts|netId|pts|dx|dy"  (one channel per player)
+// Firebase paths (under app-sandboxed "appdata/" namespace):
+//   game/running          number  0|1
+//   game/gameOver         number  0|1|2
+//   game/score            number
+//   game/misses           number
+//   game/spawn            string  "netId|type|x|y|vx|vy|vz|rx|ry|rz"
+//   game/hostSlice        string  "ts|netId|pts|dx|dy"
+//   game/participantSlice string  "ts|netId|pts|dx|dy"
 //
-// Host is authoritative for spawn, score, and misses.
-// Every player publishes their own slices; all other players apply them.
+// Host is authoritative for spawn, score, misses, and game flow.
+// Host slices → game/hostSlice → participant applies.
+// Participant slices → game/participantSlice → host applies (and adds pts).
 // ============================================================
 
-import { state, fruits, MAX_MISSES } from './constants.js';
+import { state, fruits, MAX_MISSES, GRAVITY } from './constants.js';
 import { scene } from './scene.js';
 import { fruitBuilders } from './fruits.js';
 import { createBomb } from './bombs.js';
@@ -27,87 +29,111 @@ let _endGame      = null;
 let _updateScore  = null;
 let _updateMisses = null;
 let _startGame    = null;
+let _modelsReady  = Promise.resolve(); // replaced by initSync if models.js is available
 
-let _isHost    = true;
-let _myUserId  = null;
+// Role is unknown until addSessionInfoListener fires.
+// Use null so we can detect "not yet known" vs a confirmed role.
+let _isHost = null;
 
-// Players whose slice channels we are already subscribed to
-const _knownPlayers = new Set();
-// Per-player dedup timestamp
-const _lastSliceTs  = new Map();
-
-// fruit netId registry (host assigns IDs sequentially)
 let _netIdCounter = 1;
 const _netFruits  = new Map();
+let _lastHostSliceTs        = 0;
+let _lastParticipantSliceTs = 0;
 
-// ---- Public API ----------------------------------------
+// ---- Public API -------------------------------------------
 
 export function initSync(deps) {
   _endGame      = deps.endGame;
   _updateScore  = deps.updateScore;
   _updateMisses = deps.updateMisses;
   _startGame    = deps.startGame;
+  if (deps.modelsReady) _modelsReady = deps.modelsReady;
 
   if (!squidly) return;
 
-  // Learn our own userId and subscribe to all currently-known players
-  squidly.addSessionInfoListener((info) => {
-    _myUserId = info.user || 'host';
-    _isHost   = _myUserId.startsWith('host');
+  // Cache latest Firebase values so we can replay them once role is confirmed
+  let _cachedRunning  = null;
+  let _cachedScore    = null;
+  let _cachedMisses   = null;
+  let _cachedGameOver = null;
 
-    const players = info.players || [_myUserId];
-    players.forEach(userId => _subscribeToPlayer(userId));
+  function _onRoleKnown() {
+    if (_isHost) return;
+    // Wait for all GLTFs before replaying cached state so the participant never
+    // sees fallback geometry or a black background on join
+    _modelsReady.then(() => {
+      if (_cachedRunning && !state.gameRunning && _startGame) _startGame();
+      if (_cachedScore    !== null) { state.score  = _cachedScore;  if (_updateScore)  _updateScore();  }
+      if (_cachedMisses   !== null) { state.misses = _cachedMisses; if (_updateMisses) _updateMisses(); }
+      if (_cachedGameOver && !state.gameRunning && _endGame) _endGame(_cachedGameOver === 2);
+    });
+  }
+
+  squidly.addSessionInfoListener((info) => {
+    const user = (info && info.user) || 'host';
+    // "host", "host-mouse", "host-eyes" → host. Anything else → participant.
+    _isHost = String(user).startsWith('host');
+    _onRoleKnown();
   });
 
-  // Non-host auto-starts when host starts the game
+  // Non-host auto-starts when host starts (gated on models being ready)
   squidly.firebaseOnValue('game/running', (val) => {
-    if (_isHost || !val) return;
-    if (!state.gameRunning && _startGame) _startGame();
+    _cachedRunning = val;
+    if (_isHost === null || _isHost || !val) return;
+    _modelsReady.then(() => {
+      if (!state.gameRunning && _startGame) _startGame();
+    });
   });
 
   // Non-host receives fruit spawns from host
   squidly.firebaseOnValue('game/spawn', (val) => {
-    if (!val || _isHost) return;
+    if (!val || _isHost === null || _isHost) return;
     _applyRemoteSpawn(val);
   });
 
-  // Non-host mirrors score from host
+  // Host receives participant slices
+  squidly.firebaseOnValue('game/participantSlice', (val) => {
+    if (!val || _isHost === null || !_isHost) return;
+    _applyRemoteSlice(val, 'participant');
+  });
+
+  // Participant receives host slices
+  squidly.firebaseOnValue('game/hostSlice', (val) => {
+    if (!val || _isHost === null || _isHost) return;
+    _applyRemoteSlice(val, 'host');
+  });
+
+  // Non-host mirrors score
   squidly.firebaseOnValue('game/score', (val) => {
-    if (_isHost || val === null || val === undefined) return;
+    if (val === null || val === undefined) return;
+    _cachedScore = val;
+    if (_isHost === null || _isHost) return;
     state.score = val;
     if (_updateScore) _updateScore();
   });
 
-  // Non-host mirrors miss count from host
+  // Non-host mirrors miss count
   squidly.firebaseOnValue('game/misses', (val) => {
-    if (_isHost || val === null || val === undefined) return;
+    if (val === null || val === undefined) return;
+    _cachedMisses = val;
+    if (_isHost === null || _isHost) return;
     state.misses = val;
     if (_updateMisses) _updateMisses();
-    if (state.misses >= MAX_MISSES && state.gameRunning) {
-      if (_endGame) _endGame(false);
+    if (state.misses >= MAX_MISSES && state.gameRunning && _endGame) {
+      _endGame(false);
     }
   });
 
   // Non-host follows host game-over signal
   squidly.firebaseOnValue('game/gameOver', (val) => {
-    if (_isHost || !val || !state.gameRunning) return;
+    _cachedGameOver = val;
+    if (_isHost === null || _isHost || !val || !state.gameRunning) return;
     if (_endGame) _endGame(val === 2);
   });
 }
 
-/**
- * Subscribe to a player's slice channel (idempotent).
- * Called from initSync (via session info) and from squidly.js (via cursor events)
- * so that any newly-discovered player is immediately wired up.
- */
-export function ensurePlayerSubscribed(userId) {
-  if (!squidly || !userId) return;
-  _subscribeToPlayer(userId);
-}
-
-export function getIsHost()       { return _isHost; }
-export function getMyUserId()     { return _myUserId; }
-export function getIsMultiplayer(){ return _knownPlayers.size > 1; }
+// null = role not yet known → treat as host so spawning isn't blocked on host device
+export function getIsHost() { return _isHost !== false; }
 
 export function assignNetId(fruit) {
   fruit.userData.netId = _netIdCounter++;
@@ -127,18 +153,21 @@ export function publishSpawn(fruit) {
     d.netId, type,
     p.x.toFixed(4), p.y.toFixed(4),
     d.vx.toFixed(4), d.vy.toFixed(4), d.vz.toFixed(4),
-    d.rotSpeedX.toFixed(4), d.rotSpeedY.toFixed(4), d.rotSpeedZ.toFixed(4)
+    d.rotSpeedX.toFixed(4), d.rotSpeedY.toFixed(4), d.rotSpeedZ.toFixed(4),
+    Date.now()
   ].join('|');
   squidly.firebaseSet('game/spawn', data);
 }
 
 export function publishSlice(fruit, pts, dx, dy) {
-  if (!squidly || !_myUserId) return;
+  if (!squidly) return;
   const netId = fruit.userData.netId;
   if (netId === undefined) return;
-  const ts   = Date.now();
-  const data = `${ts}|${netId}|${pts}|${dx.toFixed(2)}|${dy.toFixed(2)}`;
-  squidly.firebaseSet(`game/slices/${_myUserId}`, data);
+  const ts  = Date.now();
+  const pos = fruit.position;
+  const data = `${ts}|${netId}|${pts}|${dx.toFixed(2)}|${dy.toFixed(2)}|${pos.x.toFixed(3)}|${pos.y.toFixed(3)}`;
+  const path = _isHost ? 'game/hostSlice' : 'game/participantSlice';
+  squidly.firebaseSet(path, data);
 }
 
 export function publishMiss() {
@@ -168,23 +197,11 @@ export function publishGameOver(bombDeath) {
 export function resetSync() {
   _netFruits.clear();
   _netIdCounter = 1;
-  // Reset dedup timestamps so old events are not replayed on restart
-  _lastSliceTs.forEach((_, userId) => _lastSliceTs.set(userId, 0));
+  _lastHostSliceTs = 0;
+  _lastParticipantSliceTs = 0;
 }
 
-// ---- Internal helpers ----------------------------------
-
-function _subscribeToPlayer(userId) {
-  if (_knownPlayers.has(userId)) return;
-  _knownPlayers.add(userId);
-  _lastSliceTs.set(userId, 0);
-
-  squidly.firebaseOnValue(`game/slices/${userId}`, (val) => {
-    // Firebase echoes our own writes back — skip them
-    if (!val || userId === _myUserId) return;
-    _applyRemoteSlice(val, userId);
-  });
-}
+// ---- Internal helpers -------------------------------------
 
 function _applyRemoteSpawn(val) {
   try {
@@ -199,6 +216,7 @@ function _applyRemoteSpawn(val) {
     const rx = parseFloat(p[7]);
     const ry = parseFloat(p[8]);
     const rz = parseFloat(p[9]);
+    const spawnTs = p.length > 10 ? parseInt(p[10]) : 0;
 
     if (_netFruits.has(netId)) return;
 
@@ -212,10 +230,15 @@ function _applyRemoteSpawn(val) {
       return;
     }
 
-    fruit.position.set(x, y, 0);
+    // Fast-forward physics to compensate for Firebase latency
+    const elapsed = spawnTs ? Math.min((Date.now() - spawnTs) / 1000, 1.5) : 0;
+    const fx = x + vx * elapsed;
+    const fy = y + vy * elapsed + 0.5 * GRAVITY * elapsed * elapsed;
+
+    fruit.position.set(fx, fy, 0);
     fruit.userData.netId     = netId;
     fruit.userData.vx        = vx;
-    fruit.userData.vy        = vy;
+    fruit.userData.vy        = vy + GRAVITY * elapsed;
     fruit.userData.vz        = vz;
     fruit.userData.rotSpeedX = rx;
     fruit.userData.rotSpeedY = ry;
@@ -232,7 +255,7 @@ function _applyRemoteSpawn(val) {
   }
 }
 
-function _applyRemoteSlice(val, fromUserId) {
+function _applyRemoteSlice(val, from) {
   try {
     const p     = val.split('|');
     const ts    = parseInt(p[0]);
@@ -240,14 +263,25 @@ function _applyRemoteSlice(val, fromUserId) {
     const pts   = parseInt(p[2]);
     const dx    = parseFloat(p[3]);
     const dy    = parseFloat(p[4]);
+    const px    = p.length > 5 ? parseFloat(p[5]) : NaN;
+    const py    = p.length > 6 ? parseFloat(p[6]) : NaN;
 
-    // Per-sender dedup
-    const lastTs = _lastSliceTs.get(fromUserId) || 0;
-    if (ts <= lastTs) return;
-    _lastSliceTs.set(fromUserId, ts);
+    if (from === 'host') {
+      if (ts <= _lastHostSliceTs) return;
+      _lastHostSliceTs = ts;
+    } else {
+      if (ts <= _lastParticipantSliceTs) return;
+      _lastParticipantSliceTs = ts;
+    }
 
     const fruit = _netFruits.get(netId);
     if (!fruit || fruit.userData.sliced || fruit.userData.missed) return;
+
+    // Snap to sender's exact position so halves/juice appear at the right spot
+    if (!isNaN(px) && !isNaN(py)) {
+      fruit.position.x = px;
+      fruit.position.y = py;
+    }
 
     if (fruit.userData.isBomb) {
       fruit.userData.sliced = true;
@@ -263,7 +297,7 @@ function _applyRemoteSlice(val, fromUserId) {
     playSlice();
     fruit.userData.sliced = true;
 
-    // Host is score-authoritative
+    // Host is score-authoritative — add pts on host when applying participant slice
     if (_isHost) {
       state.score += pts;
       if (_updateScore) _updateScore();

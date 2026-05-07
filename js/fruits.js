@@ -79,7 +79,7 @@ export function createApple() {
   group.userData.seedColor = 0x5d4037;
   group.userData.fruitRadius = 0.95;
   group.userData.fruitName = 'apple';
-  group.scale.setScalar(2.8);
+  group.scale.setScalar(3.78);
   return group;
 }
 
@@ -123,7 +123,7 @@ export function createOrange() {
   group.userData.seedColor = 0xffffff;
   group.userData.fruitRadius = 0.88;
   group.userData.fruitName = 'orange';
-  group.scale.setScalar(2.8);
+  group.scale.setScalar(3.78);
   return group;
 }
 
@@ -205,7 +205,7 @@ export function createBanana() {
   group.userData.seedColor = null;
   group.userData.fruitRadius = 0.6;
   group.userData.fruitName = 'banana';
-  group.scale.setScalar(2.8);
+  group.scale.setScalar(3.78);
   return group;
 }
 
@@ -268,7 +268,7 @@ export function createWatermelon() {
   group.userData.seedColor = 0x1b1b1b;
   group.userData.fruitRadius = 1.0;
   group.userData.fruitName = 'watermelon';
-  group.scale.setScalar(4.0);
+  group.scale.setScalar(5.4);
   return group;
 }
 
@@ -384,7 +384,187 @@ export function createDragonFruit() {
   group.userData.seedColor = 0x222222;
   group.userData.fruitRadius = 0.8;
   group.userData.fruitName = 'dragonfruit';
-  group.scale.setScalar(3.5);
+  group.scale.setScalar(4.73);
+  return group;
+}
+
+export function createPapaya() {
+  const group = new THREE.Group();
+
+  if (models.papayaWholeModel) {
+    const model = models.papayaWholeModel.clone(true);
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+        child.castShadow = true;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const wrapper = new THREE.Group();
+    model.position.set(-center.x, -center.y, -center.z);
+    wrapper.add(model);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 0) wrapper.scale.setScalar(1.4 / maxDim);
+    group.add(wrapper);
+  } else {
+    // Fallback — elongated papaya shape
+    const bodyGeo = new THREE.SphereGeometry(0.55, 32, 24);
+    const bodyMat = new THREE.MeshPhysicalMaterial({
+      color: 0xff9933, roughness: 0.45, clearcoat: 0.3,
+      envMap: envMap, envMapIntensity: 0.3,
+    });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.scale.set(0.85, 1.35, 0.85);
+    body.castShadow = true;
+    group.add(body);
+  }
+
+  group.userData.juiceColor = 0xff8855;
+  group.userData.fruitColor = 0xff7733;
+  group.userData.fleshColor = 0xff6b3d;
+  group.userData.skinColor = 0xff9933;
+  group.userData.seedColor = 0x111111;
+  group.userData.fruitRadius = 0.9;
+  group.userData.fruitName = 'papaya';
+  group.scale.setScalar(4.05);
+  return group;
+}
+
+export function createMango() {
+  const group = new THREE.Group();
+
+  if (models.mangoWholeModel) {
+    const model = models.mangoWholeModel.clone(true);
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+        child.castShadow = true;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const wrapper = new THREE.Group();
+    model.position.set(-center.x, -center.y, -center.z);
+    wrapper.add(model);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 0) wrapper.scale.setScalar(1.3 / maxDim);
+    group.add(wrapper);
+  } else {
+    const bodyGeo = new THREE.SphereGeometry(0.55, 32, 24);
+    const bodyMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffc233, roughness: 0.4, clearcoat: 0.35,
+      envMap: envMap, envMapIntensity: 0.35,
+    });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.scale.set(0.9, 1.25, 0.85);
+    body.castShadow = true;
+    group.add(body);
+  }
+
+  group.userData.juiceColor = 0xffdd66;
+  group.userData.fruitColor = 0xffa726;
+  group.userData.fleshColor = 0xffb74d;
+  group.userData.skinColor = 0xffc233;
+  group.userData.seedColor = 0xc78a2a;
+  group.userData.fruitRadius = 0.85;
+  group.userData.fruitName = 'mango';
+  group.scale.setScalar(3.92);
+  return group;
+}
+
+export function createKiwi() {
+  const group = new THREE.Group();
+
+  if (models.kiwiWholeModel) {
+    const model = models.kiwiWholeModel.clone(true);
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+        child.castShadow = true;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const wrapper = new THREE.Group();
+    model.position.set(-center.x, -center.y, -center.z);
+    wrapper.add(model);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 0) wrapper.scale.setScalar(1.1 / maxDim);
+    group.add(wrapper);
+  } else {
+    const bodyGeo = new THREE.SphereGeometry(0.5, 32, 24);
+    const bodyMat = new THREE.MeshPhysicalMaterial({
+      color: 0x8b6f3b, roughness: 0.8, clearcoat: 0.1,
+      envMap: envMap, envMapIntensity: 0.2,
+    });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.scale.set(0.9, 1.15, 0.9);
+    body.castShadow = true;
+    group.add(body);
+  }
+
+  group.userData.juiceColor = 0xccee88;
+  group.userData.fruitColor = 0x8b6f3b;
+  group.userData.fleshColor = 0x9acd32;
+  group.userData.skinColor = 0x8b6f3b;
+  group.userData.seedColor = 0x111111;
+  group.userData.fruitRadius = 0.75;
+  group.userData.fruitName = 'kiwi';
+  group.scale.setScalar(3.78);
+  return group;
+}
+
+export function createPomegranate() {
+  const group = new THREE.Group();
+
+  if (models.pomegranateWholeModel) {
+    const model = models.pomegranateWholeModel.clone(true);
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+        child.castShadow = true;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const wrapper = new THREE.Group();
+    model.position.set(-center.x, -center.y, -center.z);
+    wrapper.add(model);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 0) wrapper.scale.setScalar(1.2 / maxDim);
+    group.add(wrapper);
+  } else {
+    const bodyGeo = new THREE.SphereGeometry(0.55, 32, 24);
+    const bodyMat = new THREE.MeshPhysicalMaterial({
+      color: 0xa12f3b, roughness: 0.5, clearcoat: 0.3,
+      envMap: envMap, envMapIntensity: 0.3,
+    });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.castShadow = true;
+    group.add(body);
+  }
+
+  group.userData.juiceColor = 0xff3355;
+  group.userData.fruitColor = 0xa12f3b;
+  group.userData.fleshColor = 0xc42848;
+  group.userData.skinColor = 0xa12f3b;
+  group.userData.seedColor = 0xe63946;
+  group.userData.fruitRadius = 0.8;
+  group.userData.fruitName = 'pomegranate';
+  group.scale.setScalar(3.78);
   return group;
 }
 
@@ -394,6 +574,10 @@ export const fruitBuilders = {
   banana: createBanana,
   watermelon: createWatermelon,
   dragonfruit: createDragonFruit,
+  papaya: createPapaya,
+  mango: createMango,
+  kiwi: createKiwi,
+  pomegranate: createPomegranate,
 };
 
-export const fruitScores = { apple: 10, orange: 10, banana: 15, watermelon: 20, dragonfruit: 25 };
+export const fruitScores = { apple: 10, orange: 10, banana: 15, watermelon: 20, dragonfruit: 25, papaya: 15, mango: 15, kiwi: 15, pomegranate: 20 };

@@ -19,9 +19,11 @@
     #hud {
       position: fixed;
       top: 20px;
-      left: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 10;
       pointer-events: none;
+      text-align: center;
     }
     #score-label {
       font-size: clamp(24px, 5vw, 48px);
@@ -144,8 +146,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <!-- Remove squidly-mock.js before deploying to real Squidly platform -->
-  <script src="squidly-mock.js"></script>
   <script type="module" src="js/game.js"></script>
 </body>
 </html>

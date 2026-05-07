@@ -9,6 +9,7 @@ import { createHalf } from './slicing.js';
 import { fruitScores } from './fruits.js';
 import { playSlice } from './music.js';
 import { publishSlice } from './sync.js';
+import { remoteTrail } from './squidly.js';
 
 const raycaster = new THREE.Raycaster();
 const pointerNDC = new THREE.Vector2();
@@ -51,7 +52,6 @@ export function initInput(deps) {
 // ---- Pointer / Swipe ----
 function onPointerDown(e) {
   if (!state.gameRunning) return;
-  if (window.__squidlyMockGazeOnly && window.__squidlyMockGazeOnly()) return;
   const x = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
   const y = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
   state.pointerDown = true;
@@ -65,7 +65,6 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   if (!state.pointerDown || !state.gameRunning) return;
-  if (window.__squidlyMockGazeOnly && window.__squidlyMockGazeOnly()) return;
   const x = e.clientX !== undefined ? e.clientX : e.touches[0].clientX;
   const y = e.clientY !== undefined ? e.clientY : e.touches[0].clientY;
   state.lastPointerX = state.pointerX;
@@ -178,7 +177,7 @@ export function drawTrail() {
   for (let i = 1; i < trail.length; i++) {
     const age = (now - trail[i].time) / 150;
     const agePrev = (now - trail[i - 1].time) / 150;
-    if (age > 1 || agePrev > 1) continue; // same fix here
+    if (age > 1 || agePrev > 1) continue;
     const alpha = (1 - age) * 0.3;
     const width = (1 - age) * 16 + 4;
     trailCtx.strokeStyle = `rgba(150,200,255,${alpha.toFixed(2)})`;
@@ -186,6 +185,35 @@ export function drawTrail() {
     trailCtx.beginPath();
     trailCtx.moveTo(trail[i - 1].x, trail[i - 1].y);
     trailCtx.lineTo(trail[i].x, trail[i].y);
+    trailCtx.stroke();
+  }
+
+  // Remote player's blade trail — orange/warm to distinguish from local blue
+  for (let i = 1; i < remoteTrail.length; i++) {
+    const age = (now - remoteTrail[i].time) / 150;
+    const agePrev = (now - remoteTrail[i - 1].time) / 150;
+    if (age > 1 || agePrev > 1) continue;
+    const alpha = (1 - age) * 0.8;
+    const width = (1 - age) * 6 + 1;
+    trailCtx.strokeStyle = `rgba(255,160,50,${alpha.toFixed(2)})`;
+    trailCtx.lineWidth = width;
+    trailCtx.beginPath();
+    trailCtx.moveTo(remoteTrail[i - 1].x, remoteTrail[i - 1].y);
+    trailCtx.lineTo(remoteTrail[i].x, remoteTrail[i].y);
+    trailCtx.stroke();
+  }
+  // Remote glow
+  for (let i = 1; i < remoteTrail.length; i++) {
+    const age = (now - remoteTrail[i].time) / 150;
+    const agePrev = (now - remoteTrail[i - 1].time) / 150;
+    if (age > 1 || agePrev > 1) continue;
+    const alpha = (1 - age) * 0.3;
+    const width = (1 - age) * 16 + 4;
+    trailCtx.strokeStyle = `rgba(255,120,30,${alpha.toFixed(2)})`;
+    trailCtx.lineWidth = width;
+    trailCtx.beginPath();
+    trailCtx.moveTo(remoteTrail[i - 1].x, remoteTrail[i - 1].y);
+    trailCtx.lineTo(remoteTrail[i].x, remoteTrail[i].y);
     trailCtx.stroke();
   }
 }

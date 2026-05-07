@@ -6,7 +6,7 @@ export const GRAVITY = -12;
 export const MAX_MISSES = 5;
 export const SPAWN_INTERVAL_MIN = 1400;
 export const SPAWN_INTERVAL_MAX = 3000;
-export const FRUIT_TYPES = ['watermelon', 'orange'];
+export const FRUIT_TYPES = ['watermelon', 'orange', 'papaya', 'mango', 'kiwi', 'pomegranate'];
 export const BOMB_CHANCE = 0.15;
 export const MIN_SPAWN_DIST = 2.5;
 

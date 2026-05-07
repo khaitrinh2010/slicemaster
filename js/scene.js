@@ -3,6 +3,7 @@
 // ============================================================
 
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a0a2e); // match body bg — no black flash while texture loads
 const bgLoader = new THREE.TextureLoader();
 bgLoader.load('background.jpg', (texture) => {
   scene.background = texture;

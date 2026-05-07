@@ -22,10 +22,11 @@ import {
   publishScore, publishMiss, publishGameStart, publishGameOver
 } from './sync.js';
 import { startMusic, stopMusic, playBackgroundMusic, stopBackgroundMusic } from './music.js';
+import { modelsReady } from './models.js';
 
 // ---- DOM ----
 const scoreLabel = document.getElementById('score-label');
-const comboLabel = document.getElementById('combo-label');
+const comboLabel = document.getElementById('combo-labyel');
 const missLabel = document.getElementById('miss-label');
 const menuMain = document.getElementById('menu-main');
 const menuGameover = document.getElementById('menu-gameover');
@@ -44,7 +45,7 @@ function getWorldXForScreenFrac(frac, y = -2, z = 0) {
 }
 
 function spawnFruit() {
-  const isBomb = Math.random() < BOMB_CHANCE;
+  const isBomb = false;
   let fruit;
 
   if (isBomb) {
@@ -70,7 +71,7 @@ function spawnFruit() {
     if (side === 0)      { x = leftX  + Math.random() * 0.7; nvx =  2.5 + Math.random() * 1.5; }
     else if (side === 2) { x = rightX - Math.random() * 0.7; nvx = -2.5 - Math.random() * 1.5; }
     else                 { x = centerX + (Math.random() - 0.5) * 1.5; nvx = (Math.random() - 0.5) * 2; }
-    return { x, y, vx: nvx, vy: 9 + Math.random() * 4, vz: (Math.random() - 0.5) * 2 };
+    return { x, y, vx: nvx, vy: 13 + Math.random() * 5, vz: (Math.random() - 0.5) * 2 };
   }
 
   // Reject if any time-slice of the new trajectory is too close to an existing fruit.
@@ -213,7 +214,6 @@ function menuHandler() {
   slicedParts.length = 0;
   juiceParticles.forEach(p => scene.remove(p));
   juiceParticles.length = 0;
-  showSquidlyPlayIcon(); // <-- ensure icon is shown every time
 }
 
 // ---- Button Handlers ----
@@ -222,21 +222,6 @@ const btnRestart = document.getElementById('btn-restart');
 const btnMenu = document.getElementById('btn-menu');
 const btnStart = document.getElementById('btn-start');
 
-// Squidly icon for Play on main menu
-function showSquidlyPlayIcon() {
-  if (squidlyApi) {
-    squidlyApi.setIcon(0, 0, {
-      symbol: 'play_arrow',
-      displayValue: 'PLAY',
-      type: 'action'
-    }, () => startGame());
-  }
-}
-
-// On initial load, show icon if menu is visible
-if (!menuMain.classList.contains('hidden')) {
-  showSquidlyPlayIcon();
-}
 
 btnRestart.addEventListener('click', startGame);
 if (btnRestart.parentElement && btnRestart.parentElement.tagName === 'ACCESS-BUTTON') {
@@ -271,7 +256,7 @@ renderer.localClippingEnabled = true;
 // ---- Initialize subsystems ----
 initInput({ endGame, updateScore });
 initSquidly({ endGame, updateScore });
-initSync({ endGame, updateScore, updateMisses, startGame });
+initSync({ endGame, updateScore, updateMisses, startGame, modelsReady });
 
 // ---- Main Loop ----
 function animate() {
