@@ -5,5 +5,5 @@
     "version": "1.0.0",
     "description": "A 3D fruit slicing game built with Three.js. Swipe to slice fruits, earn combos, and beat your high score. Supports gaze and switch control via Squidly.",
     "author": "BlockNinja",
-    "icon": ""
+    "icon": "Image20260507210445.png"
 }
