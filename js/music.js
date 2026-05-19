@@ -47,6 +47,12 @@ export function toggleMute() {
   backgroundMusic.muted = _muted;
   return _muted;
 }
+export function setMute(val) {
+  _muted = !!val;
+  music.muted = _muted;
+  backgroundMusic.muted = _muted;
+}
+export function getMuted() { return _muted; }
 
 // Slice sound effect — uses Web Audio API for extra-loud playback
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();

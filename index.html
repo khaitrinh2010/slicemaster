@@ -18,7 +18,7 @@
     /* HUD */
     #hud {
       position: fixed;
-      top: 20px;
+      top: 2.5vh;
       left: 50%;
       transform: translateX(-50%);
       z-index: 10;
@@ -26,13 +26,13 @@
       text-align: center;
     }
     #score-label {
-      font-size: clamp(24px, 5vw, 48px);
+      font-size: clamp(2.5vmin, 5vw, 5vmin);
       color: #fff;
       font-weight: bold;
       text-shadow: 0 2px 10px rgba(0,0,0,0.7);
     }
     #combo-label {
-      font-size: clamp(14px, 3vw, 24px);
+      font-size: clamp(1.5vmin, 3vw, 3vmin);
       color: #ffdd57;
       font-weight: bold;
       text-shadow: 0 2px 8px rgba(0,0,0,0.5);
@@ -41,9 +41,9 @@
     }
     #miss-label {
       position: fixed;
-      top: 20px;
-      right: 20px;
-      font-size: clamp(18px, 4vw, 32px);
+      top: 2.5vh;
+      right: 2.5vw;
+      font-size: clamp(2vmin, 4vw, 4vmin);
       color: #ff4444;
       font-weight: bold;
       text-shadow: 0 2px 8px rgba(0,0,0,0.5);
@@ -65,26 +65,26 @@
     }
     .overlay.hidden { display: none; }
     .overlay h1 {
-      font-size: clamp(36px, 8vw, 72px);
+      font-size: clamp(4vmin, 8vw, 8vmin);
       color: #fff;
-      margin-bottom: 10px;
+      margin-bottom: 1vmin;
       text-shadow: 0 4px 20px rgba(255,100,0,0.5);
     }
     .overlay h2 {
-      font-size: clamp(18px, 4vw, 32px);
+      font-size: clamp(2vmin, 4vw, 4vmin);
       color: #ffdd57;
-      margin-bottom: 30px;
+      margin-bottom: 4vmin;
     }
     .overlay button {
       display: block;
-      margin: 8px;
-      padding: 14px 40px;
-      font-size: clamp(16px, 3vw, 22px);
+      margin: 1vmin;
+      padding: 1.5vmin 4vmin;
+      font-size: clamp(2vmin, 3vw, 3vmin);
       font-weight: bold;
       color: #fff;
       background: linear-gradient(135deg, #ff6b35, #e8272c);
       border: none;
-      border-radius: 30px;
+      border-radius: 3vmin;
       cursor: pointer;
       transition: transform 0.15s, box-shadow 0.15s;
       box-shadow: 0 4px 15px rgba(255,80,30,0.4);
@@ -104,16 +104,16 @@
 
     #btn-mute {
       position: fixed;
-      bottom: 16px;
-      right: 16px;
+      bottom: 2vmin;
+      right: 2vmin;
       z-index: 30;
-      width: 40px;
-      height: 40px;
+      width: 11vmin;
+      height: 11vmin;
       border-radius: 50%;
       border: none;
       background: rgba(0,0,0,0.45);
       color: #fff;
-      font-size: 18px;
+      font-size: 5.5vmin;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -131,14 +131,14 @@
   <div id="miss-label">⭕⭕⭕⭕⭕</div>
 
   <!-- Slow-mo bar -->
-  <div id="slowmo" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10;
+  <div id="slowmo" style="position:fixed;bottom:3vh;left:50%;transform:translateX(-50%);z-index:10;
     pointer-events:none;opacity:0;transition:opacity 0.3s;">
-    <div style="font-size:clamp(12px,2vw,18px);color:#88ddff;font-weight:bold;text-align:center;
-      text-shadow:0 0 10px rgba(100,200,255,0.7);margin-bottom:4px;">⏳ SLOW MODE</div>
-    <div style="width:clamp(120px,30vw,240px);height:8px;background:rgba(255,255,255,0.15);
-      border-radius:4px;overflow:hidden;">
+    <div style="font-size:clamp(1.5vmin,2vw,2vmin);color:#88ddff;font-weight:bold;text-align:center;
+      text-shadow:0 0 10px rgba(100,200,255,0.7);margin-bottom:0.5vmin;">⏳ SLOW MODE</div>
+    <div style="width:clamp(15vmin,30vw,30vmin);height:1vmin;background:rgba(255,255,255,0.15);
+      border-radius:0.5vmin;overflow:hidden;">
       <div id="slowmo-bar" style="width:100%;height:100%;background:linear-gradient(90deg,#44bbff,#88ddff);
-        border-radius:4px;transform-origin:left;transition:transform 0.05s;"></div>
+        border-radius:0.5vmin;transform-origin:left;transition:transform 0.05s;"></div>
     </div>
   </div>
 
