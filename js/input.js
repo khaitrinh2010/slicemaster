@@ -4,7 +4,7 @@
 
 import { state, fruits, trail, TRAIL_LENGTH, SLOWMO_DURATION } from './constants.js';
 import { scene, camera } from './scene.js';
-import { spawnJuice, spawnExplosion } from './particles.js';
+import { spawnJuice, spawnExplosion, spawnSliceBurst } from './particles.js';
 import { createHalf } from './slicing.js';
 import { fruitScores } from './fruits.js';
 import { playSlice } from './music.js';
@@ -104,6 +104,7 @@ function onPointerMove(e) {
 
       // SLICED!
       playSlice();
+      spawnSliceBurst(fruit.position.clone(), fruit.userData.fruitColor || 0xffffff, 18);
       fruit.userData.sliced = true;
       const name = fruit.userData.fruitName;
       const pts = fruitScores[name] || 10;

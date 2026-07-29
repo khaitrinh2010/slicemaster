@@ -35,6 +35,80 @@ export function spawnJuice(position, color, count) {
   }
 }
 
+export function spawnSliceBurst(position, color, count = 16) {
+  const flash = document.createElement('div');
+  flash.style.cssText = `
+    position:fixed;inset:0;z-index:90;pointer-events:none;
+    background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.28), rgba(255,244,190,0.12), rgba(255,180,80,0.04), transparent 74%);
+    animation: sliceBurstFlash 0.4s ease-out forwards;
+  `;
+  document.body.appendChild(flash);
+  setTimeout(() => flash.remove(), 450);
+
+  if (!document.getElementById('slice-burst-style')) {
+    const style = document.createElement('style');
+    style.id = 'slice-burst-style';
+    style.textContent = `
+      @keyframes sliceBurstFlash {
+        0% { opacity: 0.9; transform: scale(0.8); }
+        100% { opacity: 0; transform: scale(1.18); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const base = new THREE.Color(color || 0xfff3b0);
+  const accentA = base.clone().offsetHSL(0.04, 0.15, 0.2);
+  const accentB = base.clone().offsetHSL(-0.05, 0.2, 0.25);
+  const accentC = new THREE.Color(0xffffff);
+  const accents = [base, accentA, accentB, accentC];
+
+  for (let i = 0; i < count; i++) {
+    const pick = accents[Math.floor(Math.random() * accents.length)];
+    const mat = new THREE.MeshBasicMaterial({
+      color: pick,
+      transparent: true,
+      opacity: 0.92
+    });
+    const p = new THREE.Mesh(explosionGeo, mat);
+    p.position.copy(position);
+    p.scale.setScalar(0.12 + Math.random() * 0.16);
+
+    const speed = 1.8 + Math.random() * 3.6;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI * 0.65;
+    p.userData.vx = Math.sin(phi) * Math.cos(theta) * speed;
+    p.userData.vy = Math.cos(phi) * speed * 0.7 + 1.0;
+    p.userData.vz = Math.sin(theta) * speed * 0.2;
+    p.userData.life = 0.28 + Math.random() * 0.16;
+    p.userData.decay = 1.4 + Math.random() * 0.35;
+    p.userData.isSliceBurst = true;
+
+    scene.add(p);
+    explosionParts.push(p);
+  }
+
+  const ringGeo = new THREE.RingGeometry(0.03, 0.22, 28);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0xfff5c2,
+    transparent: true,
+    opacity: 0.85,
+    side: THREE.DoubleSide
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.copy(position);
+  ring.lookAt(camera.position);
+  ring.userData.vx = 0;
+  ring.userData.vy = 0;
+  ring.userData.vz = 0;
+  ring.userData.life = 0.22;
+  ring.userData.decay = 1.9;
+  ring.userData.isRing = true;
+  ring.userData.isSliceBurst = true;
+  scene.add(ring);
+  explosionParts.push(ring);
+}
+
 export function spawnExplosion(position) {
   // Screen flash
   const flash = document.createElement('div');
@@ -142,7 +216,8 @@ export function updateExplosionParticles(rawDt) {
     p.material.opacity = Math.max(0, p.userData.life);
 
     if (p.userData.isRing) {
-      const s = 1 + (1 - p.userData.life / 0.5) * 8;
+      const ringLife = p.userData.isSliceBurst ? 0.25 : 0.5;
+      const s = 1 + (1 - p.userData.life / ringLife) * (p.userData.isSliceBurst ? 3.5 : 8);
       p.scale.setScalar(s);
     }
 

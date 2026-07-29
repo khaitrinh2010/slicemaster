@@ -19,9 +19,9 @@ import { initSquidly, saveHighScore } from './squidly.js';
 import {
   initSync, getIsHost, resetSync,
   assignNetId, registerFruit, publishSpawn,
-  publishScore, publishMiss, publishGameStart, publishGameOver, publishStartRequest
+  publishScore, publishMiss, publishGameStart, publishGameOver, publishStartRequest, publishMute
 } from './sync.js';
-import { startMusic, stopMusic, playBackgroundMusic, stopBackgroundMusic, toggleMute } from './music.js';
+import { startMusic, stopMusic, playBackgroundMusic, stopBackgroundMusic, toggleMute, getMuted } from './music.js';
 import { modelsReady } from './models.js';
 
 // ---- DOM ----
@@ -220,9 +220,14 @@ function menuHandler() {
 // ---- Button Handlers ----
 const squidlyApi = window.SquidlyAPI || null;
 const btnMute = document.getElementById('btn-mute');
+btnMute.textContent = getMuted() ? '🔇' : '🔊';
 btnMute.addEventListener('click', () => {
   const muted = toggleMute();
   btnMute.textContent = muted ? '🔇' : '🔊';
+  publishMute(muted);
+});
+window.addEventListener('mute-state-changed', () => {
+  btnMute.textContent = getMuted() ? '🔇' : '🔊';
 });
 
 const btnRestart = document.getElementById('btn-restart');

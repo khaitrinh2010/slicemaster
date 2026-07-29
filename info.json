@@ -1,6 +1,6 @@
 {
     "name": "fruit-ninja-3d",
-    "title": "Fruit Ninja 3D",
+    "title": "Slice Master",
     "subtitle": "Slice fruits with your eyes or mouse!",
     "version": "1.0.0",
     "description": "A 3D fruit slicing game built with Three.js. Swipe to slice fruits, earn combos, and beat your high score. Supports gaze and switch control via Squidly.",

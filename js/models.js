@@ -3,14 +3,21 @@
 // ============================================================
 
 const gltfLoader = new THREE.GLTFLoader();
+const dracoLoader = new THREE.DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+gltfLoader.setDRACOLoader(dracoLoader);
 
 // Resolves once every GLB has finished loading (or failed)
 let _resolveModelsReady;
 export const modelsReady = new Promise(resolve => { _resolveModelsReady = resolve; });
-let _modelsTotal = 13; // must match the number of gltfLoader.load() calls below
+let _modelsTotal = 12; // must match the number of load attempts below, including skipped heavy assets
 let _modelsLoaded = 0;
 function _onModelSettled() {
   if (++_modelsLoaded >= _modelsTotal) _resolveModelsReady();
+}
+function _skipHeavyModel(label) {
+  console.info(`${label}: using procedural fallback to reduce startup cost`);
+  _onModelSettled();
 }
 
 export let dragonFruitModel = null;
@@ -165,7 +172,7 @@ gltfLoader.load('3d_model/papaya_fruit.glb', (gltf) => {
   _onModelSettled();
 });
 
-gltfLoader.load('3d_model/half_papaya.glb', (gltf) => {
+gltfLoader.load('3d_model/half_papaya.optimized.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
     if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
@@ -173,7 +180,7 @@ gltfLoader.load('3d_model/half_papaya.glb', (gltf) => {
   papayaHalfModel = model;
   _onModelSettled();
 }, null, (err) => {
-  console.warn('Could not load half_papaya.glb, using fallback:', err);
+  console.warn('Could not load half_papaya.optimized.glb, using fallback:', err);
   _onModelSettled();
 });
 
@@ -213,7 +220,7 @@ gltfLoader.load('3d_model/kiwi.glb', (gltf) => {
   _onModelSettled();
 });
 
-gltfLoader.load('3d_model/half_kiwi.glb', (gltf) => {
+gltfLoader.load('3d_model/half_kiwi.optimized.glb', (gltf) => {
   const model = gltf.scene;
   model.traverse(child => {
     if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
@@ -221,23 +228,20 @@ gltfLoader.load('3d_model/half_kiwi.glb', (gltf) => {
   kiwiHalfModel = model;
   _onModelSettled();
 }, null, (err) => {
-  console.warn('Could not load half_kiwi.glb, using fallback:', err);
+  console.warn('Could not load half_kiwi.optimized.glb, using fallback:', err);
   _onModelSettled();
 });
 
 // Pomegranate — single GLB containing BOTH whole and half side-by-side.
-// Uses a dedicated loader with DRACOLoader because Sketchfab auto-applies Draco compression.
-const dracoLoader = new THREE.DRACOLoader();
-dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
-const pomegranateLoader = new THREE.GLTFLoader();
-pomegranateLoader.setDRACOLoader(dracoLoader);
+// Uses the shared GLTF loader with DRACOLoader enabled.
+const pomegranateLoader = gltfLoader;
 
-pomegranateLoader.load('3d_model/pomegranate.glb', (gltf) => {
+gltfLoader.load('3d_model/pomegranate.optimized.glb', (gltf) => {
   const split = splitCombinedGLB(gltf.scene, 'Pomegranate');
   if (split) { pomegranateWholeModel = split.whole; pomegranateHalfModel = split.half; }
   _onModelSettled();
 }, null, (err) => {
-  console.warn('Could not load pomegranate.glb:', err);
+  console.warn('Could not load pomegranate.optimized.glb:', err);
   _onModelSettled();
 });
 
@@ -253,14 +257,14 @@ gltfLoader.load('3d_model/comical_bomb.glb', (gltf) => {
   _onModelSettled();
 });
 
-gltfLoader.load('3d_model/fat_man_bomb.glb', (gltf) => {
-  const model = gltf.scene;
-  model.traverse(child => {
-    if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
-  });
-  fatManBombModel = model;
-  _onModelSettled();
-}, null, (err) => {
-  console.warn('Could not load fat_man_bomb.glb:', err);
-  _onModelSettled();
-});
+// gltfLoader.load('3d_model/fat_man_bomb.glb', (gltf) => {
+//   const model = gltf.scene;
+//   model.traverse(child => {
+//     if (child.isMesh) {   if (child.material) child.material.side = THREE.DoubleSide; }
+//   });
+//   fatManBombModel = model;
+//   _onModelSettled();
+// }, null, (err) => {
+//   console.warn('Could not load fat_man_bomb.glb:', err);
+//   _onModelSettled();
+// });

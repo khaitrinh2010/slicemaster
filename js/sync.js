@@ -20,10 +20,12 @@ import { scene } from './scene.js';
 import { fruitBuilders } from './fruits.js';
 import { createBomb } from './bombs.js';
 import { createHalf } from './slicing.js';
-import { spawnJuice, spawnExplosion } from './particles.js';
-import { playSlice } from './music.js';
+import { spawnJuice, spawnExplosion, spawnSliceBurst } from './particles.js';
+import { playSlice, setMute } from './music.js';
 
-const squidly = window.SquidlyAPI || null;
+function getSquidly() {
+  return window.SquidlyAPI || null;
+}
 
 let _endGame      = null;
 let _updateScore  = null;
@@ -43,6 +45,8 @@ let _lastParticipantSliceTs = 0;
 // ---- Public API -------------------------------------------
 
 export function initSync(deps) {
+  const squidly = getSquidly();
+
   _endGame      = deps.endGame;
   _updateScore  = deps.updateScore;
   _updateMisses = deps.updateMisses;
@@ -56,8 +60,10 @@ export function initSync(deps) {
   let _cachedScore    = null;
   let _cachedMisses   = null;
   let _cachedGameOver = null;
+  let _cachedMuted    = null;
 
   function _onRoleKnown() {
+    if (_cachedMuted !== null) setMute(_cachedMuted);
     if (_isHost) return;
     // Wait for all GLTFs before replaying cached state so the participant never
     // sees fallback geometry or a black background on join
@@ -138,6 +144,13 @@ export function initSync(deps) {
     if (_isHost === null || _isHost || !val || !state.gameRunning) return;
     if (_endGame) _endGame(val === 2);
   });
+
+  squidly.firebaseOnValue('game/muted', (val) => {
+    if (val === null || val === undefined) return;
+    _cachedMuted = val === true || val === 1 || val === '1';
+    if (_isHost === null) return;
+    setMute(_cachedMuted);
+  });
 }
 
 // null = role not yet known → treat as host so spawning isn't blocked on host device
@@ -153,6 +166,7 @@ export function registerFruit(fruit) {
 }
 
 export function publishSpawn(fruit) {
+  const squidly = getSquidly();
   if (!squidly || !_isHost) return;
   const d = fruit.userData;
   const p = fruit.position;
@@ -168,6 +182,7 @@ export function publishSpawn(fruit) {
 }
 
 export function publishSlice(fruit, pts, dx, dy) {
+  const squidly = getSquidly();
   if (!squidly) return;
   const netId = fruit.userData.netId;
   if (netId === undefined) return;
@@ -179,21 +194,25 @@ export function publishSlice(fruit, pts, dx, dy) {
 }
 
 export function publishMiss() {
+  const squidly = getSquidly();
   if (!squidly || !_isHost) return;
   squidly.firebaseSet('game/misses', state.misses);
 }
 
 export function publishScore() {
+  const squidly = getSquidly();
   if (!squidly || !_isHost) return;
   squidly.firebaseSet('game/score', state.score);
 }
 
 export function publishStartRequest() {
+  const squidly = getSquidly();
   if (!squidly) return;
   squidly.firebaseSet('game/startRequest', Date.now());
 }
 
 export function publishGameStart() {
+  const squidly = getSquidly();
   if (!squidly || !_isHost) return;
   squidly.firebaseSet('game/score',    0);
   squidly.firebaseSet('game/misses',   0);
@@ -202,9 +221,16 @@ export function publishGameStart() {
 }
 
 export function publishGameOver(bombDeath) {
+  const squidly = getSquidly();
   if (!squidly || !_isHost) return;
   squidly.firebaseSet('game/running',  0);
   squidly.firebaseSet('game/gameOver', bombDeath ? 2 : 1);
+}
+
+export function publishMute(muted) {
+  const squidly = getSquidly();
+  if (!squidly) return;
+  squidly.firebaseSet('game/muted', muted ? 1 : 0);
 }
 
 export function resetSync() {
@@ -308,6 +334,7 @@ function _applyRemoteSlice(val, from) {
     }
 
     playSlice();
+    spawnSliceBurst(fruit.position.clone(), fruit.userData.fruitColor || 0xffffff, 18);
     fruit.userData.sliced = true;
 
     // Host is score-authoritative — add pts on host when applying participant slice
